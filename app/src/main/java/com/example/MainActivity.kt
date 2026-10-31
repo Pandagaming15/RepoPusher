@@ -63,6 +63,7 @@ class MainActivity : ComponentActivity() {
                 var showCloneDialog by remember { mutableStateOf(false) }
                 var cloneInitialUrl by remember { mutableStateOf("") }
                 var showNewProjectDialog by remember { mutableStateOf(false) }
+                var showCreateGitHubRepoDialog by remember { mutableStateOf(false) }
                 var showBranchDialog by remember { mutableStateOf(false) }
                 var showCommitHistoryDialog by remember { mutableStateOf(false) }
                 var showProjectFilesDialog by remember { mutableStateOf(false) }
@@ -180,6 +181,7 @@ class MainActivity : ComponentActivity() {
                                         cloneInitialUrl = url
                                         showCloneDialog = true
                                     },
+                                    onCreateGitHubRepo = { showCreateGitHubRepoDialog = true },
                                     onViewReadme = { owner, repo ->
                                         viewModel.showReadme(owner, repo)
                                     },
@@ -244,10 +246,25 @@ class MainActivity : ComponentActivity() {
                             activeRepo = activeRepo,
                             localRepos = localRepos,
                             projectFiles = projectFiles,
+                            isAuthenticated = viewModel.isGitHubAuthenticated(),
                             isLoading = isLoading,
                             onDismiss = { showQuickPublish = false },
+                            onSaveToken = { viewModel.saveGitHubToken(it) },
                             onPublish = { name, desc, priv, branch, msg, onSuccess ->
                                 viewModel.executeQuickPublish(name, desc, priv, branch, msg, onSuccess)
+                            }
+                        )
+                    }
+
+                    if (showCreateGitHubRepoDialog) {
+                        CreateGitHubRepoDialog(
+                            isAuthenticated = viewModel.isGitHubAuthenticated(),
+                            currentUsername = gitHubUser?.login ?: "",
+                            isLoading = isLoading,
+                            onDismiss = { showCreateGitHubRepoDialog = false },
+                            onSaveToken = { viewModel.saveGitHubToken(it) },
+                            onCreateRepo = { name, desc, priv, autoInit, onComplete ->
+                                viewModel.createRemoteGitHubRepo(name, desc, priv, autoInit, onComplete)
                             }
                         )
                     }

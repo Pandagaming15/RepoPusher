@@ -36,6 +36,7 @@ fun RepositoriesScreen(
     onNewProject: () -> Unit,
     onImportSaf: () -> Unit,
     onCloneRepo: (initialUrl: String) -> Unit,
+    onCreateGitHubRepo: () -> Unit = {},
     onViewReadme: (owner: String, repo: String) -> Unit,
     onNavigateSettings: () -> Unit,
     modifier: Modifier = Modifier
@@ -144,6 +145,40 @@ fun RepositoriesScreen(
                     Icon(Icons.Default.Download, contentDescription = null, tint = GitHubPurple, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Clone", fontSize = 12.sp, color = GitHubTextPrimary)
+                }
+            }
+        } else {
+            // Action Toolbar for GitHub Tab
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = onCreateGitHubRepo,
+                    colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("new_github_repo_button")
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("New GitHub Repo", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+
+                Button(
+                    onClick = { onCloneRepo("") },
+                    colors = ButtonDefaults.buttonColors(containerColor = GitHubDarkSurfaceVariant),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("clone_github_repo_button")
+                ) {
+                    Icon(Icons.Default.Download, contentDescription = null, tint = GitHubPurple, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Clone URL", fontSize = 12.sp, color = GitHubTextPrimary)
                 }
             }
         }

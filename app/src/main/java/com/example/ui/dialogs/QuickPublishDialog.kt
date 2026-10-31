@@ -32,8 +32,10 @@ fun QuickPublishDialog(
     activeRepo: LocalRepository?,
     localRepos: List<LocalRepository>,
     projectFiles: List<ProjectFile>,
+    isAuthenticated: Boolean = true,
     isLoading: Boolean,
     onDismiss: () -> Unit,
+    onSaveToken: (String) -> Unit = {},
     onPublish: (repoName: String, desc: String, isPrivate: Boolean, branch: String, commitMsg: String, (String) -> Unit) -> Unit
 ) {
     var step by remember { mutableStateOf(1) }
@@ -44,6 +46,7 @@ fun QuickPublishDialog(
     var branchName by remember { mutableStateOf("main") }
     var commitMessage by remember { mutableStateOf("Initial publish from RepoStudio") }
     var publishResultUrl by remember { mutableStateOf<String?>(null) }
+    var quickTokenInput by remember { mutableStateOf("") }
     val context = LocalContext.current
 
     Dialog(onDismissRequest = { if (!isLoading) onDismiss() }) {
@@ -200,8 +203,50 @@ fun QuickPublishDialog(
 
                     3, 4 -> {
                         Text("Step 3 & 4: Configure GitHub Target", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = GitHubTextPrimary)
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
+                        if (!isAuthenticated) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0x22F85149),
+                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubRed)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Text("GitHub Token Required", color = GitHubRed, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text("Enter your Personal Access Token (PAT) with 'repo' scope to publish to GitHub:", color = GitHubTextSecondary, fontSize = 11.sp)
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        OutlinedTextField(
+                                            value = quickTokenInput,
+                                            onValueChange = { quickTokenInput = it },
+                                            placeholder = { Text("ghp_... or github_pat_...") },
+                                            modifier = Modifier.weight(1f),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = GitHubGreen,
+                                                unfocusedBorderColor = GitHubDarkBorder
+                                            )
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Button(
+                                            onClick = {
+                                                if (quickTokenInput.isNotBlank()) {
+                                                    onSaveToken(quickTokenInput.trim())
+                                                    quickTokenInput = ""
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
+                                            enabled = quickTokenInput.isNotBlank()
+                                        ) {
+                                            Text("Save")
+                                        }
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                        }
+
+                        val cleanPreview = repoName.trim().replace("\\s+".toRegex(), "-").replace("[^a-zA-Z0-9_.-]".toRegex(), "-")
                         OutlinedTextField(
                             value = repoName,
                             onValueChange = { repoName = it },
@@ -214,6 +259,14 @@ fun QuickPublishDialog(
                                 unfocusedBorderColor = GitHubDarkBorder
                             )
                         )
+                        if (repoName.isNotBlank() && repoName != cleanPreview) {
+                            Text(
+                                text = "GitHub repository will be named: $cleanPreview",
+                                fontSize = 11.sp,
+                                color = GitHubBlue,
+                                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                            )
+                        }
 
                         Spacer(modifier = Modifier.height(8.dp))
 

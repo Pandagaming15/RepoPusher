@@ -567,6 +567,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun createRemoteGitHubRepo(
+        name: String,
+        description: String,
+        isPrivate: Boolean,
+        autoInit: Boolean,
+        onComplete: (GitHubRepo) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            withContext(Dispatchers.IO) {
+                try {
+                    val repo = repoService.createRemoteGitHubRepository(name, description, isPrivate, autoInit)
+                    _statusMessage.value = "Repository created on GitHub: ${repo.htmlUrl}"
+                    loadGitHubUserAndRepos()
+                    withContext(Dispatchers.Main) {
+                        onComplete(repo)
+                    }
+                } catch (e: Exception) {
+                    _errorMessage.value = e.message
+                } finally {
+                    _operationLogs.value = repoService.operationLogs
+                    _isLoading.value = false
+                }
+            }
+        }
+    }
+
     fun createPullRequest(owner: String, repo: String, title: String, body: String, head: String, base: String, onComplete: (String) -> Unit) {
         viewModelScope.launch {
             _isLoading.value = true

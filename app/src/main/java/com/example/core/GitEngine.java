@@ -64,8 +64,8 @@ public class GitEngine {
 
     private CredentialsProvider createCredentialsProvider(String token) {
         if (token != null && !token.trim().isEmpty()) {
-            // GitHub accepts personal access token or OAuth token as password or username
-            return new UsernamePasswordCredentialsProvider(token.trim(), "");
+            // GitHub accepts personal access token / OAuth token with username "x-access-token"
+            return new UsernamePasswordCredentialsProvider("x-access-token", token.trim());
         }
         return CredentialsProvider.getDefault();
     }
@@ -316,10 +316,22 @@ public class GitEngine {
                     .setCredentialsProvider(createCredentialsProvider(token));
 
             if (branchName != null && !branchName.isEmpty()) {
-                push.add(branchName);
+                push.setRefSpecs(new org.eclipse.jgit.transport.RefSpec("refs/heads/" + branchName + ":refs/heads/" + branchName));
             }
 
-            Iterable<PushResult> results = push.call();
+            Iterable<PushResult> results;
+            try {
+                results = push.call();
+            } catch (Exception ex) {
+                String msg = ex.getMessage() != null ? ex.getMessage() : "";
+                if (msg.contains("not authorized") || msg.contains("401") || msg.contains("Authentication")) {
+                    throw new Exception("GitHub push failed: Authentication error. Please verify your token has 'repo' write permissions in Settings.");
+                } else if (msg.contains("not found") || msg.contains("404")) {
+                    throw new Exception("GitHub push failed: Remote repository not found. Verify repository exists on GitHub and that your token has access.");
+                }
+                throw ex;
+            }
+
             StringBuilder sb = new StringBuilder();
             boolean hasSuccess = false;
 
@@ -346,11 +358,20 @@ public class GitEngine {
 
     public synchronized String pull(File directory, String remoteName, String branchName, String token) throws Exception {
         try (Git git = Git.open(directory)) {
-            PullResult pullResult = git.pull()
-                    .setRemote(remoteName)
-                    .setRemoteBranchName(branchName)
-                    .setCredentialsProvider(createCredentialsProvider(token))
-                    .call();
+            PullResult pullResult;
+            try {
+                pullResult = git.pull()
+                        .setRemote(remoteName)
+                        .setRemoteBranchName(branchName)
+                        .setCredentialsProvider(createCredentialsProvider(token))
+                        .call();
+            } catch (Exception ex) {
+                String msg = ex.getMessage() != null ? ex.getMessage() : "";
+                if (msg.contains("not authorized") || msg.contains("401")) {
+                    throw new Exception("GitHub pull failed: Authentication error. Please verify your token in Settings.");
+                }
+                throw ex;
+            }
 
             if (!pullResult.isSuccessful()) {
                 if (pullResult.getMergeResult() != null && pullResult.getMergeResult().getConflicts() != null) {

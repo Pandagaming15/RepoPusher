@@ -118,9 +118,20 @@ public class GitHubApiClient {
     }
 
     public GitHubRepo createRepository(String name, String description, boolean isPrivate, boolean autoInit) throws IOException {
+        String token = keystoreManager.getGitHubToken();
+        if (token == null || token.trim().isEmpty()) {
+            throw new IOException("GitHub token is not set. Please configure your Personal Access Token in Settings before creating a repository.");
+        }
+
+        // Sanitize name: GitHub repo names cannot contain spaces or illegal characters
+        String cleanName = name.trim().replaceAll("\\s+", "-").replaceAll("[^a-zA-Z0-9_.-]", "-");
+        if (cleanName.isEmpty()) {
+            throw new IOException("Repository name cannot be empty. Please provide a valid repository name.");
+        }
+
         try {
             JSONObject payload = new JSONObject();
-            payload.put("name", name);
+            payload.put("name", cleanName);
             payload.put("description", description != null ? description : "");
             payload.put("private", isPrivate);
             payload.put("auto_init", autoInit);
@@ -131,17 +142,47 @@ public class GitHubApiClient {
             try (Response response = httpClient.newCall(request).execute()) {
                 String responseBody = response.body() != null ? response.body().string() : "{}";
                 if (!response.isSuccessful()) {
-                    JSONObject errObj = new JSONObject(responseBody);
-                    String message = errObj.optString("message", "Failed with HTTP " + response.code());
-                    throw new IOException(message);
+                    String errorMsg = "HTTP " + response.code();
+                    try {
+                        JSONObject errObj = new JSONObject(responseBody);
+                        if (errObj.has("message")) {
+                            errorMsg = errObj.getString("message");
+                        }
+                        if (errObj.has("errors")) {
+                            JSONArray errors = errObj.getJSONArray("errors");
+                            StringBuilder sb = new StringBuilder();
+                            for (int i = 0; i < errors.length(); i++) {
+                                Object item = errors.get(i);
+                                if (item instanceof JSONObject) {
+                                    JSONObject eObj = (JSONObject) item;
+                                    if (eObj.has("message")) {
+                                        sb.append(" (").append(eObj.getString("message")).append(")");
+                                    }
+                                } else {
+                                    sb.append(" (").append(item.toString()).append(")");
+                                }
+                            }
+                            errorMsg += sb.toString();
+                        }
+                    } catch (Exception ignored) {}
+
+                    if (response.code() == 401) {
+                        throw new IOException("GitHub Authentication Failed (HTTP 401): Bad credentials. Please ensure your token is valid and active in Settings.");
+                    } else if (response.code() == 403) {
+                        throw new IOException("GitHub Permission Denied (HTTP 403): " + errorMsg + ". Please verify your token has the 'repo' scope.");
+                    } else if (response.code() == 422) {
+                        throw new IOException("Repository already exists or name invalid (HTTP 422): " + errorMsg);
+                    } else {
+                        throw new IOException("Failed to create repository on GitHub: " + errorMsg);
+                    }
                 }
                 JSONObject obj = new JSONObject(responseBody);
                 GitHubRepo repo = new GitHubRepo();
                 repo.setId(obj.optLong("id"));
-                repo.setName(obj.optString("name", ""));
+                repo.setName(obj.optString("name", cleanName));
                 repo.setFullName(obj.optString("full_name", repo.getName()));
                 repo.setDescription(obj.optString("description", ""));
-                repo.setPrivate(obj.optBoolean("private", false));
+                repo.setPrivate(obj.optBoolean("private", isPrivate));
                 repo.setHtmlUrl(obj.optString("html_url", ""));
                 repo.setCloneUrl(obj.optString("clone_url", ""));
                 repo.setDefaultBranch(obj.optString("default_branch", "main"));

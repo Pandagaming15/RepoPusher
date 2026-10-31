@@ -218,29 +218,65 @@ public class RepositoryService {
         return res;
     }
 
+    public GitHubRepo createRemoteGitHubRepository(String name, String description, boolean isPrivate, boolean autoInit) throws Exception {
+        String token = keystoreManager.getGitHubToken();
+        if (token == null || token.trim().isEmpty()) {
+            throw new Exception("GitHub token is not set. Please go to Settings and enter your Personal Access Token (with 'repo' scope).");
+        }
+        logOperation("Create GitHub Repo", name, "Creating repository on GitHub...", OperationLog.Level.INFO);
+        try {
+            GitHubRepo repo = gitHubApiClient.createRepository(name, description, isPrivate, autoInit);
+            logOperation("Create GitHub Repo", name, "Successfully created: " + repo.getHtmlUrl(), OperationLog.Level.SUCCESS);
+            return repo;
+        } catch (Exception e) {
+            logOperation("Create GitHub Repo Failed", name, e.getMessage(), OperationLog.Level.ERROR);
+            throw e;
+        }
+    }
+
     public void quickPublish(File projectDir, String repoName, String description, boolean isPrivate, String branchName, String commitMsg) throws Exception {
         String token = keystoreManager.getGitHubToken();
         if (token == null || token.trim().isEmpty()) {
-            throw new Exception("Authentication required: Please add a GitHub token in Settings to publish.");
+            throw new Exception("GitHub authentication required: Please add a Personal Access Token with 'repo' scope in Settings.");
         }
 
-        logOperation("Publish Step 1/4", repoName, "Checking or creating GitHub remote repository...", OperationLog.Level.INFO);
+        // Sanitize name for GitHub API
+        String cleanRepoName = repoName.trim().replaceAll("\\s+", "-").replaceAll("[^a-zA-Z0-9_.-]", "-");
+        if (cleanRepoName.isEmpty()) cleanRepoName = "My-Repo";
+
+        logOperation("Publish Step 1/4", cleanRepoName, "Creating remote repository on GitHub...", OperationLog.Level.INFO);
 
         // 1. Create or verify GitHub repository
         GitHubRepo remoteRepo;
         try {
-            remoteRepo = gitHubApiClient.createRepository(repoName, description, isPrivate, false);
-            logOperation("Publish Step 1/4", repoName, "Created remote repository: " + remoteRepo.getHtmlUrl(), OperationLog.Level.SUCCESS);
+            remoteRepo = gitHubApiClient.createRepository(cleanRepoName, description, isPrivate, false);
+            logOperation("Publish Step 1/4", cleanRepoName, "Created remote repository: " + remoteRepo.getHtmlUrl(), OperationLog.Level.SUCCESS);
         } catch (Exception e) {
-            // Repo might already exist, try to construct clone URL
-            logOperation("Publish Step 1/4 Warning", repoName, "Notice during repo creation: " + e.getMessage() + ". Attempting to use existing remote.", OperationLog.Level.WARNING);
-            remoteRepo = new GitHubRepo(repoName, repoName, description, isPrivate, "https://github.com", "https://github.com/" + repoName + ".git", branchName);
+            String errMsg = e.getMessage() != null ? e.getMessage() : "";
+            if (errMsg.contains("already exists") || errMsg.contains("422")) {
+                // If it already exists on user's GitHub, locate clone URL with real login
+                String userLogin = "";
+                try {
+                    GitHubUser u = gitHubApiClient.getCurrentUser();
+                    userLogin = u.getLogin();
+                } catch (Exception ignored) {}
+                if (userLogin.isEmpty()) {
+                    userLogin = keystoreManager.getGitAuthorName().replaceAll("\\s+", "");
+                }
+                String cloneUrl = "https://github.com/" + userLogin + "/" + cleanRepoName + ".git";
+                String htmlUrl = "https://github.com/" + userLogin + "/" + cleanRepoName;
+                remoteRepo = new GitHubRepo(cleanRepoName, userLogin + "/" + cleanRepoName, description, isPrivate, htmlUrl, cloneUrl, branchName);
+                logOperation("Publish Step 1/4", cleanRepoName, "Repository already exists on GitHub, using remote: " + htmlUrl, OperationLog.Level.WARNING);
+            } else {
+                logOperation("Publish Failed", cleanRepoName, "Could not create repository on GitHub: " + errMsg, OperationLog.Level.ERROR);
+                throw new Exception("Could not create repository on GitHub: " + errMsg);
+            }
         }
 
         // 2. Initialize Git locally if needed
         if (!gitEngine.isGitRepository(projectDir)) {
             gitEngine.initRepository(projectDir);
-            logOperation("Publish Step 2/4", repoName, "Initialized local Git repository", OperationLog.Level.INFO);
+            logOperation("Publish Step 2/4", cleanRepoName, "Initialized local Git repository", OperationLog.Level.INFO);
         }
 
         // 3. Configure Remote URL
@@ -252,7 +288,7 @@ public class RepositoryService {
         String authorName = keystoreManager.getGitAuthorName();
         String authorEmail = keystoreManager.getGitAuthorEmail();
         GitCommitInfo commitInfo = gitEngine.commit(projectDir, commitMsg, authorName, authorEmail);
-        logOperation("Publish Step 3/4", repoName, "Committed files: " + commitInfo.getShortId(), OperationLog.Level.INFO);
+        logOperation("Publish Step 3/4", cleanRepoName, "Committed files: " + commitInfo.getShortId(), OperationLog.Level.INFO);
 
         // 5. Checkout or ensure branch name
         if (branchName != null && !branchName.isEmpty()) {
@@ -270,12 +306,12 @@ public class RepositoryService {
         }
 
         // 6. Push to remote
-        logOperation("Publish Step 4/4", repoName, "Pushing local commits to GitHub...", OperationLog.Level.INFO);
+        logOperation("Publish Step 4/4", cleanRepoName, "Pushing local commits to GitHub...", OperationLog.Level.INFO);
         String pushResult = gitEngine.push(projectDir, "origin", branchName, token);
-        logOperation("Publish Complete", repoName, "Successfully published to " + cloneUrl + "\n" + pushResult, OperationLog.Level.SUCCESS);
+        logOperation("Publish Complete", cleanRepoName, "Successfully published to " + cloneUrl + "\n" + pushResult, OperationLog.Level.SUCCESS);
 
         // Update active repo
-        LocalRepository local = new LocalRepository(repoName, projectDir.getAbsolutePath(), cloneUrl, branchName, true);
+        LocalRepository local = new LocalRepository(cleanRepoName, projectDir.getAbsolutePath(), cloneUrl, branchName, true);
         setActiveRepository(local);
     }
 }
