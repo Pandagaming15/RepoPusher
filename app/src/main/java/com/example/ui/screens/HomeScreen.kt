@@ -43,6 +43,7 @@ fun HomeScreen(
     onOpenFiles: () -> Unit,
     onPush: () -> Unit,
     onPull: () -> Unit,
+    onOpenFolder: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -202,10 +203,20 @@ fun HomeScreen(
                         }
                     } else {
                         Text(
-                            text = "Choose or create a repository from the Repositories tab to begin.",
+                            text = "No repository currently open. Select any project folder from your device directly in-place without importing.",
                             fontSize = 12.sp,
                             color = GitHubTextSecondary
                         )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = onOpenFolder,
+                            colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.FolderOpen, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Open Device Folder (In-Place)", fontWeight = FontWeight.Bold)
+                        }
                     }
 
                     if (activeRepo != null && !activeRepo.isGitInitialized) {

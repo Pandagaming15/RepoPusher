@@ -2,6 +2,8 @@ package com.example.core;
 
 import android.content.Context;
 import android.net.Uri;
+import android.os.Environment;
+import android.provider.DocumentsContract;
 import android.util.Log;
 
 import androidx.documentfile.provider.DocumentFile;
@@ -128,6 +130,146 @@ public class SafFileManager {
                 scanRecursive(root, file, results, excluded);
             }
         }
+    }
+
+    public static class OpenFolderResult {
+        private final File directory;
+        private final String folderName;
+        private final boolean inPlace;
+        private final int copiedFileCount;
+
+        public OpenFolderResult(File directory, String folderName, boolean inPlace, int copiedFileCount) {
+            this.directory = directory;
+            this.folderName = folderName;
+            this.inPlace = inPlace;
+            this.copiedFileCount = copiedFileCount;
+        }
+
+        public File getDirectory() { return directory; }
+        public String getFolderName() { return folderName; }
+        public boolean isInPlace() { return inPlace; }
+        public int getCopiedFileCount() { return copiedFileCount; }
+    }
+
+    public String extractFolderName(Uri treeUri) {
+        if (treeUri == null) return "Project";
+        try {
+            DocumentFile doc = DocumentFile.fromTreeUri(context, treeUri);
+            if (doc != null && doc.getName() != null && !doc.getName().trim().isEmpty()) {
+                return doc.getName().trim();
+            }
+        } catch (Exception ignored) {}
+
+        try {
+            String docId = DocumentsContract.getTreeDocumentId(treeUri);
+            if (docId != null) {
+                int colonIdx = docId.indexOf(':');
+                String pathPart = colonIdx >= 0 ? docId.substring(colonIdx + 1) : docId;
+                if (pathPart.endsWith("/")) pathPart = pathPart.substring(0, pathPart.length() - 1);
+                int slashIdx = pathPart.lastIndexOf('/');
+                String name = slashIdx >= 0 ? pathPart.substring(slashIdx + 1) : pathPart;
+                if (!name.trim().isEmpty()) return name.trim();
+            }
+        } catch (Exception ignored) {}
+
+        String lastSeg = treeUri.getLastPathSegment();
+        if (lastSeg != null) {
+            int colonIdx = lastSeg.indexOf(':');
+            String pathPart = colonIdx >= 0 ? lastSeg.substring(colonIdx + 1) : lastSeg;
+            if (pathPart.endsWith("/")) pathPart = pathPart.substring(0, pathPart.length() - 1);
+            int slashIdx = pathPart.lastIndexOf('/');
+            String name = slashIdx >= 0 ? pathPart.substring(slashIdx + 1) : pathPart;
+            if (!name.trim().isEmpty()) return name.trim();
+        }
+        return "Project";
+    }
+
+    public File resolveDirectFile(Uri treeUri) {
+        if (treeUri == null) return null;
+        try {
+            String docId = DocumentsContract.getTreeDocumentId(treeUri);
+            if (docId != null) {
+                if (docId.startsWith("primary:")) {
+                    String subPath = docId.substring("primary:".length());
+                    if (subPath.startsWith("/")) subPath = subPath.substring(1);
+                    File primaryDir = Environment.getExternalStorageDirectory();
+                    File target = new File(primaryDir, subPath);
+                    if (target.exists()) return target;
+
+                    File emulated = new File("/storage/emulated/0", subPath);
+                    if (emulated.exists()) return emulated;
+
+                    if (target.getParentFile() != null && target.getParentFile().exists()) {
+                        return target;
+                    }
+                } else if (docId.startsWith("raw:")) {
+                    File raw = new File(docId.substring("raw:".length()));
+                    if (raw.exists()) return raw;
+                } else if (docId.contains(":")) {
+                    String[] parts = docId.split(":", 2);
+                    File storage = new File("/storage", parts[0]);
+                    if (storage.exists() && parts.length > 1) {
+                        File target = new File(storage, parts[1]);
+                        if (target.exists()) return target;
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+
+        try {
+            String path = treeUri.getPath();
+            if (path != null) {
+                if (path.startsWith("/tree/primary:")) {
+                    String sub = path.substring("/tree/primary:".length());
+                    if (sub.startsWith("/")) sub = sub.substring(1);
+                    File target = new File(Environment.getExternalStorageDirectory(), sub);
+                    if (target.exists()) return target;
+                } else if (path.startsWith("/document/primary:")) {
+                    String sub = path.substring("/document/primary:".length());
+                    if (sub.startsWith("/")) sub = sub.substring(1);
+                    File target = new File(Environment.getExternalStorageDirectory(), sub);
+                    if (target.exists()) return target;
+                }
+            }
+        } catch (Exception ignored) {}
+
+        return null;
+    }
+
+    public OpenFolderResult openFolder(Uri treeUri) throws IOException {
+        if (treeUri == null) {
+            throw new IOException("Storage URI cannot be null");
+        }
+
+        String realFolderName = extractFolderName(treeUri);
+        File directFile = resolveDirectFile(treeUri);
+
+        // If direct filesystem file exists and is accessible, use it directly in-place without copying!
+        if (directFile != null && directFile.exists() && directFile.isDirectory()) {
+            try {
+                File[] testList = directFile.listFiles();
+                if (testList != null) {
+                    Log.i(TAG, "Successfully opened folder in-place without importing: " + directFile.getAbsolutePath());
+                    return new OpenFolderResult(directFile, realFolderName, true, 0);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Direct read check failed for " + directFile.getAbsolutePath() + ": " + e.getMessage());
+            }
+        }
+
+        // Fallback: If direct file access is blocked by OS scoped storage, copy into app project dir named with realFolderName
+        Log.i(TAG, "Falling back to local copy for " + realFolderName);
+        String cleanName = realFolderName.replaceAll("[^a-zA-Z0-9_.-]", "_");
+        if (cleanName.trim().isEmpty()) cleanName = "Project";
+        File targetDir = new File(baseProjectsDir, cleanName);
+        int idx = 1;
+        while (targetDir.exists()) {
+            targetDir = new File(baseProjectsDir, cleanName + "_" + idx++);
+        }
+        targetDir.mkdirs();
+
+        int count = importFromSafTree(treeUri, targetDir);
+        return new OpenFolderResult(targetDir, realFolderName, false, count);
     }
 
     public int importFromSafTree(Uri treeUri, File targetDir) throws IOException {

@@ -1,6 +1,7 @@
 package com.example.core;
 
 import android.content.Context;
+import android.net.Uri;
 import android.util.Log;
 
 import com.example.core.models.GitCommitInfo;
@@ -14,7 +15,9 @@ import com.example.core.models.ProjectFile;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class RepositoryService {
@@ -101,11 +104,40 @@ public class RepositoryService {
     }
 
     public List<LocalRepository> getAllLocalRepositories() {
-        List<LocalRepository> list = safFileManager.getDiscoveredRepositories();
+        List<LocalRepository> list = new ArrayList<>();
+        Set<String> seenPaths = new HashSet<>();
+
+        // 1. Projects in baseProjectsDir
+        List<LocalRepository> baseRepos = safFileManager.getDiscoveredRepositories();
+        for (LocalRepository r : baseRepos) {
+            if (!seenPaths.contains(r.getPath())) {
+                seenPaths.add(r.getPath());
+                list.add(r);
+            }
+        }
+
+        // 2. Saved external folders opened by user
+        Set<String> externalPaths = keystoreManager.getSavedExternalRepoPaths();
+        for (String path : externalPaths) {
+            if (!seenPaths.contains(path)) {
+                File dir = new File(path);
+                if (dir.exists() && dir.isDirectory()) {
+                    seenPaths.add(path);
+                    boolean isGit = gitEngine.isGitRepository(dir);
+                    String branch = isGit ? gitEngine.getCurrentBranch(dir) : "main";
+                    String remote = isGit ? gitEngine.getRemoteUrl(dir, "origin") : "";
+                    LocalRepository r = new LocalRepository(dir.getName(), dir.getAbsolutePath(), remote, branch, isGit);
+                    list.add(r);
+                }
+            }
+        }
+
+        // Update active repository details if present
         for (LocalRepository r : list) {
             if (activeRepository != null && r.getPath().equals(activeRepository.getPath())) {
                 r.setCurrentBranch(activeRepository.getCurrentBranch());
                 r.setRemoteUrl(activeRepository.getRemoteUrl());
+                r.setGitInitialized(activeRepository.isGitInitialized());
             } else if (r.exists()) {
                 File dir = new File(r.getPath());
                 if (gitEngine.isGitRepository(dir)) {
@@ -115,6 +147,41 @@ public class RepositoryService {
             }
         }
         return list;
+    }
+
+    public LocalRepository openFolderFromSaf(Uri treeUri) throws Exception {
+        SafFileManager.OpenFolderResult res = safFileManager.openFolder(treeUri);
+        File dir = res.getDirectory();
+        String folderName = res.getFolderName();
+
+        // Remember external directory path
+        keystoreManager.addSavedExternalRepoPath(dir.getAbsolutePath());
+
+        boolean isGit = gitEngine.isGitRepository(dir);
+        String branch = isGit ? gitEngine.getCurrentBranch(dir) : "main";
+        String remote = isGit ? gitEngine.getRemoteUrl(dir, "origin") : "";
+
+        LocalRepository repo = new LocalRepository(folderName, dir.getAbsolutePath(), remote, branch, isGit);
+        setActiveRepository(repo);
+
+        if (res.isInPlace()) {
+            logOperation("Open Folder", folderName, "Opened directory in-place: " + dir.getAbsolutePath() + (isGit ? " (Git detected)" : " (No Git yet)"), OperationLog.Level.SUCCESS);
+        } else {
+            logOperation("Import Folder", folderName, "Imported " + res.getCopiedFileCount() + " files into: " + dir.getAbsolutePath(), OperationLog.Level.SUCCESS);
+        }
+
+        return repo;
+    }
+
+    public void removeLocalRepository(LocalRepository repo) {
+        if (repo == null) return;
+        keystoreManager.removeSavedExternalRepoPath(repo.getPath());
+        logOperation("Remove Repository", repo.getName(), "Removed from local list: " + repo.getPath(), OperationLog.Level.INFO);
+        if (activeRepository != null && activeRepository.getPath().equals(repo.getPath())) {
+            List<LocalRepository> remaining = getAllLocalRepositories();
+            activeRepository = !remaining.isEmpty() ? remaining.get(0) : null;
+            refreshActiveRepoInfo();
+        }
     }
 
     public void logOperation(String operation, String repository, String details, OperationLog.Level level) {

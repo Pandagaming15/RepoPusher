@@ -36,11 +36,19 @@ fun QuickPublishDialog(
     isLoading: Boolean,
     onDismiss: () -> Unit,
     onSaveToken: (String) -> Unit = {},
+    onOpenFolder: () -> Unit = {},
     onPublish: (repoName: String, desc: String, isPrivate: Boolean, branch: String, commitMsg: String, (String) -> Unit) -> Unit
 ) {
     var step by remember { mutableStateOf(1) }
     var selectedRepo by remember { mutableStateOf(activeRepo) }
     var repoName by remember { mutableStateOf(activeRepo?.name ?: "MyProject") }
+
+    LaunchedEffect(activeRepo) {
+        if (activeRepo != null) {
+            selectedRepo = activeRepo
+            repoName = activeRepo.name
+        }
+    }
     var description by remember { mutableStateOf("Published via RepoStudio on Android") }
     var isPrivate by remember { mutableStateOf(false) }
     var branchName by remember { mutableStateOf("main") }
@@ -118,7 +126,22 @@ fun QuickPublishDialog(
                             fontSize = 13.sp,
                             color = GitHubTextSecondary
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        OutlinedButton(
+                            onClick = onOpenFolder,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = GitHubGreen),
+                            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubGreen))
+                        ) {
+                            Icon(Icons.Default.FolderOpen, contentDescription = null, tint = GitHubGreen, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Pick Device Folder (In-Place)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
 
                         localRepos.forEach { repo ->
                             val isSel = selectedRepo?.path == repo.path

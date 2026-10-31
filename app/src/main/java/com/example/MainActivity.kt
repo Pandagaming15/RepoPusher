@@ -105,7 +105,7 @@ class MainActivity : ComponentActivity() {
                             val takeFlags: Int = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                             context.contentResolver.takePersistableUriPermission(uri, takeFlags)
                         } catch (ignored: Exception) {}
-                        viewModel.importFromSaf(uri)
+                        viewModel.openFolderFromSaf(uri)
                     }
                 }
 
@@ -125,7 +125,8 @@ class MainActivity : ComponentActivity() {
                             localRepos = localRepos,
                             onSelectRepo = { viewModel.selectRepository(it) },
                             onRefresh = { viewModel.refreshAll() },
-                            onNewProject = { showNewProjectDialog = true }
+                            onNewProject = { showNewProjectDialog = true },
+                            onOpenFolder = { safLauncher.launch(null) }
                         )
                     },
                     bottomBar = {
@@ -165,7 +166,8 @@ class MainActivity : ComponentActivity() {
                                     onOpenBranchManager = { showBranchDialog = true },
                                     onOpenFiles = { showProjectFilesDialog = true },
                                     onPush = { viewModel.push() },
-                                    onPull = { viewModel.pull() }
+                                    onPull = { viewModel.pull() },
+                                    onOpenFolder = { safLauncher.launch(null) }
                                 )
                             }
                             NavigationTab.REPOSITORIES -> {
@@ -176,7 +178,8 @@ class MainActivity : ComponentActivity() {
                                     isAuthenticated = viewModel.isGitHubAuthenticated(),
                                     onSelectRepo = { viewModel.selectRepository(it) },
                                     onNewProject = { showNewProjectDialog = true },
-                                    onImportSaf = { safLauncher.launch(null) },
+                                    onOpenFolder = { safLauncher.launch(null) },
+                                    onRemoveRepo = { viewModel.removeRepository(it) },
                                     onCloneRepo = { url ->
                                         cloneInitialUrl = url
                                         showCloneDialog = true
@@ -250,6 +253,7 @@ class MainActivity : ComponentActivity() {
                             isLoading = isLoading,
                             onDismiss = { showQuickPublish = false },
                             onSaveToken = { viewModel.saveGitHubToken(it) },
+                            onOpenFolder = { safLauncher.launch(null) },
                             onPublish = { name, desc, priv, branch, msg, onSuccess ->
                                 viewModel.executeQuickPublish(name, desc, priv, branch, msg, onSuccess)
                             }

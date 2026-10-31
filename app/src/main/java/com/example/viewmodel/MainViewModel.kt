@@ -396,27 +396,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun importFromSaf(treeUri: Uri) {
+    fun openFolderFromSaf(treeUri: Uri) {
         viewModelScope.launch {
             _isLoading.value = true
             withContext(Dispatchers.IO) {
                 try {
-                    val folderName = "Imported_" + System.currentTimeMillis() % 10000
-                    val targetDir = repoService.safFileManager.createNewProjectDirectory(folderName)
-                    val count = repoService.safFileManager.importFromSafTree(treeUri, targetDir)
-                    repoService.gitEngine.initRepository(targetDir)
-                    val newRepo = LocalRepository(folderName, targetDir.absolutePath, "", "main", true)
-                    repoService.activeRepository = newRepo
-                    _activeRepo.value = newRepo
+                    val repo = repoService.openFolderFromSaf(treeUri)
+                    _activeRepo.value = repo
                     _localRepos.value = repoService.allLocalRepositories
                     refreshCurrentRepoData()
-                    _statusMessage.value = "Imported $count files from storage"
+                    _statusMessage.value = "Opened '${repo.name}' (${if (repo.isGitInitialized) "Git branch: ${repo.currentBranch}" else "ready to initialize"})"
                 } catch (e: Exception) {
-                    _errorMessage.value = "Import failed: ${e.message}"
+                    _errorMessage.value = "Failed to open folder: ${e.message}"
                 } finally {
                     _operationLogs.value = repoService.operationLogs
                     _isLoading.value = false
                 }
+            }
+        }
+    }
+
+    // Backward-compatible alias
+    fun importFromSaf(treeUri: Uri) {
+        openFolderFromSaf(treeUri)
+    }
+
+    fun removeRepository(repo: LocalRepository) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                repoService.removeLocalRepository(repo)
+                _localRepos.value = repoService.allLocalRepositories
+                _activeRepo.value = repoService.activeRepository
+                refreshCurrentRepoData()
+                _statusMessage.value = "Removed '${repo.name}' from repository list"
             }
         }
     }

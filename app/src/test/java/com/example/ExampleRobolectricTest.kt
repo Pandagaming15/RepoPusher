@@ -16,7 +16,7 @@ import java.io.File
 import java.io.FileWriter
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class ExampleRobolectricTest {
 
     @get:Rule
@@ -82,5 +82,31 @@ class ExampleRobolectricTest {
 
         gitEngine.checkoutBranch(projectDir, "feature-mobile")
         assertEquals("feature-mobile", gitEngine.getCurrentBranch(projectDir))
+    }
+
+    @Test
+    fun `test folder name resolution and in-place repository`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val safFileManager = com.example.core.SafFileManager(context)
+
+        // Test extracting folder name from URI
+        val testUri = android.net.Uri.parse("content://com.android.externalstorage.documents/tree/primary%3ADocuments%2FMyCoolApp")
+        val folderName = safFileManager.extractFolderName(testUri)
+        assertEquals("MyCoolApp", folderName)
+
+        // Test that external folder paths are maintained with their real name
+        val externalFolder = tempFolder.newFolder("WebPortfolio")
+        val gitEngine = GitEngine(context)
+        gitEngine.initRepository(externalFolder)
+
+        val keystoreManager = com.example.core.KeystoreManager(context)
+        keystoreManager.addSavedExternalRepoPath(externalFolder.absolutePath)
+
+        val repoService = com.example.core.RepositoryService.getInstance(context)
+        val allRepos = repoService.allLocalRepositories
+        val matched = allRepos.find { it.path == externalFolder.absolutePath }
+        assertNotNull("External folder should be listed in repositories", matched)
+        assertEquals("WebPortfolio", matched?.name)
+        assertTrue("Should detect git in external folder", matched?.isGitInitialized == true)
     }
 }

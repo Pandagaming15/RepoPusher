@@ -34,7 +34,9 @@ fun RepositoriesScreen(
     isAuthenticated: Boolean,
     onSelectRepo: (LocalRepository) -> Unit,
     onNewProject: () -> Unit,
-    onImportSaf: () -> Unit,
+    onImportSaf: () -> Unit = {},
+    onOpenFolder: () -> Unit = onImportSaf,
+    onRemoveRepo: ((LocalRepository) -> Unit)? = null,
     onCloneRepo: (initialUrl: String) -> Unit,
     onCreateGitHubRepo: () -> Unit = {},
     onViewReadme: (owner: String, repo: String) -> Unit,
@@ -122,16 +124,16 @@ fun RepositoriesScreen(
                 }
 
                 Button(
-                    onClick = onImportSaf,
+                    onClick = onOpenFolder,
                     colors = ButtonDefaults.buttonColors(containerColor = GitHubDarkSurfaceVariant),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("import_saf_button")
+                        .testTag("open_folder_button")
                 ) {
                     Icon(Icons.Default.FolderOpen, contentDescription = null, tint = GitHubBlue, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Import SAF", fontSize = 12.sp, color = GitHubTextPrimary)
+                    Text("Open Folder", fontSize = 12.sp, color = GitHubTextPrimary)
                 }
 
                 Button(
@@ -255,18 +257,34 @@ fun RepositoriesScreen(
                                             color = GitHubTextPrimary
                                         )
                                     }
-                                    if (isCurrentActive) {
-                                        Surface(
-                                            shape = RoundedCornerShape(10.dp),
-                                            color = GitHubGreenDark
-                                        ) {
-                                            Text(
-                                                text = "ACTIVE",
-                                                color = Color.White,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (isCurrentActive) {
+                                            Surface(
+                                                shape = RoundedCornerShape(10.dp),
+                                                color = GitHubGreenDark
+                                            ) {
+                                                Text(
+                                                    text = "ACTIVE",
+                                                    color = Color.White,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                        }
+                                        if (onRemoveRepo != null && (!isCurrentActive || localRepos.size > 1)) {
+                                            IconButton(
+                                                onClick = { onRemoveRepo(repo) },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Close,
+                                                    contentDescription = "Remove repository from list",
+                                                    tint = GitHubTextMuted,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -287,7 +305,22 @@ fun RepositoriesScreen(
                                             Text(repo.currentBranch, fontSize = 11.sp, color = GitHubBlue)
                                         }
                                     }
-                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    if (repo.path.contains("/storage/") || repo.path.contains("/sdcard/") || !repo.path.contains("/files/projects/")) {
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = Color(0x222EA043)
+                                        ) {
+                                            Text(
+                                                text = "In-Place",
+                                                color = GitHubGreen,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                    }
                                     Text(
                                         text = repo.path,
                                         fontFamily = FontFamily.Monospace,

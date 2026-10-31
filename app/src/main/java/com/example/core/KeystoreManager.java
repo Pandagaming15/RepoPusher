@@ -153,4 +153,25 @@ public class KeystoreManager {
     public void setOAuthClientId(String clientId) {
         preferences.edit().putString(PREF_CLIENT_ID, clientId).apply();
     }
+
+    private static final String PREF_SAVED_EXTERNAL_PATHS = "saved_external_repo_paths";
+
+    public synchronized java.util.Set<String> getSavedExternalRepoPaths() {
+        java.util.Set<String> set = preferences.getStringSet(PREF_SAVED_EXTERNAL_PATHS, null);
+        return set != null ? new java.util.HashSet<>(set) : new java.util.HashSet<>();
+    }
+
+    public synchronized void addSavedExternalRepoPath(String path) {
+        if (path == null || path.trim().isEmpty()) return;
+        java.util.Set<String> set = getSavedExternalRepoPaths();
+        set.add(path.trim());
+        preferences.edit().putStringSet(PREF_SAVED_EXTERNAL_PATHS, set).apply();
+    }
+
+    public synchronized void removeSavedExternalRepoPath(String path) {
+        if (path == null) return;
+        java.util.Set<String> set = getSavedExternalRepoPaths();
+        set.remove(path.trim());
+        preferences.edit().putStringSet(PREF_SAVED_EXTERNAL_PATHS, set).apply();
+    }
 }

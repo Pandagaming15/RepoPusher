@@ -28,6 +28,7 @@ fun AppTopBar(
     onSelectRepo: (LocalRepository) -> Unit,
     onRefresh: () -> Unit,
     onNewProject: () -> Unit,
+    onOpenFolder: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -156,6 +157,16 @@ fun AppTopBar(
                     }
 
                     Divider(color = GitHubDarkBorder)
+                    DropdownMenuItem(
+                        leadingIcon = {
+                            Icon(Icons.Default.FolderOpen, contentDescription = null, tint = GitHubGreen, modifier = Modifier.size(16.dp))
+                        },
+                        text = { Text("Open Folder (In-Place)...", color = GitHubGreen, fontSize = 13.sp) },
+                        onClick = {
+                            expanded = false
+                            onOpenFolder()
+                        }
+                    )
                     DropdownMenuItem(
                         leadingIcon = {
                             Icon(Icons.Default.Add, contentDescription = null, tint = GitHubBlue, modifier = Modifier.size(16.dp))
