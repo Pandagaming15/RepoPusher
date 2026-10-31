@@ -41,7 +41,9 @@ jobs:
           gradle-version: '9.3.1'
 
       - name: Build Debug APK
-        run: gradle --no-daemon --stacktrace :app:assembleDebug
+        run: |
+              gradle --stop
+              gradle --no-daemon --refresh-dependencies --stacktrace :app:assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v6
