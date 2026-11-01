@@ -49,6 +49,10 @@ public class LocalRepository implements Serializable {
     public String getDescription() { return description != null ? description : ""; }
     public void setDescription(String description) { this.description = description; }
 
+    private String safTreeUri = "";
+    public String getSafTreeUri() { return safTreeUri != null ? safTreeUri : ""; }
+    public void setSafTreeUri(String safTreeUri) { this.safTreeUri = safTreeUri; }
+
     public boolean exists() {
         return path != null && new File(path).exists();
     }

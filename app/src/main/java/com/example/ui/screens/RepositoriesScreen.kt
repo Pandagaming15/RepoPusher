@@ -25,6 +25,9 @@ import androidx.compose.ui.unit.sp
 import com.example.core.models.GitHubRepo
 import com.example.core.models.LocalRepository
 import com.example.ui.theme.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.viewmodel.RepositoryPathsViewModel
 
 @Composable
 fun RepositoriesScreen(
@@ -41,11 +44,14 @@ fun RepositoriesScreen(
     onCreateGitHubRepo: () -> Unit = {},
     onViewReadme: (owner: String, repo: String) -> Unit,
     onNavigateSettings: () -> Unit,
+    onOpenRepositoryPath: (String) -> Unit = {},
+    repoPathsViewModel: RepositoryPathsViewModel = viewModel(),
     modifier: Modifier = Modifier
 ) {
-    var selectedTab by remember { mutableStateOf(0) } // 0 = Local, 1 = GitHub
+    var selectedTab by remember { mutableStateOf(0) } // 0 = Local, 1 = GitHub, 2 = Saved Paths (Room)
     var searchQuery by remember { mutableStateOf("") }
     val context = LocalContext.current
+    val roomRepos by repoPathsViewModel.allRepositories.collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier
@@ -78,7 +84,7 @@ fun RepositoriesScreen(
                             text = "Local (${localRepos.size})",
                             color = if (selectedTab == 0) Color.White else GitHubTextSecondary,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
+                            fontSize = 11.sp
                         )
                     }
 
@@ -95,7 +101,25 @@ fun RepositoriesScreen(
                             text = "GitHub (${githubRepos.size})",
                             color = if (selectedTab == 1) Color.White else GitHubTextSecondary,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
+                            fontSize = 11.sp
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (selectedTab == 2) GitHubGreen else Color.Transparent)
+                            .clickable { selectedTab = 2 }
+                            .padding(vertical = 8.dp)
+                            .testTag("tab_saved_paths_room"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Saved Paths (${roomRepos.size})",
+                            color = if (selectedTab == 2) Color.White else GitHubTextSecondary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
                         )
                     }
                 }
@@ -345,7 +369,7 @@ fun RepositoriesScreen(
                     }
                 }
             }
-        } else {
+        } else if (selectedTab == 1) {
             // GitHub Tab
             if (!isAuthenticated) {
                 Box(
@@ -500,6 +524,14 @@ fun RepositoriesScreen(
                     }
                 }
             }
+        } else {
+            // Saved Paths (Room Database) Tab
+            RepositoryPathsScreen(
+                viewModel = repoPathsViewModel,
+                isEmbedded = true,
+                onOpenRepositoryPath = { entity -> onOpenRepositoryPath(entity.path) },
+                onPickFolderFromSaf = onOpenFolder
+            )
         }
     }
 }

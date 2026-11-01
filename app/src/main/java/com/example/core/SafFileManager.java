@@ -132,23 +132,30 @@ public class SafFileManager {
         }
     }
 
+    private static final Set<String> EXCLUDED_FROM_SYNC = new HashSet<>(Arrays.asList(
+            "node_modules", ".gradle", "build", ".idea", "bin", "out", ".dart_tool", "target"
+    ));
+
     public static class OpenFolderResult {
         private final File directory;
         private final String folderName;
         private final boolean inPlace;
         private final int copiedFileCount;
+        private final String treeUriString;
 
-        public OpenFolderResult(File directory, String folderName, boolean inPlace, int copiedFileCount) {
+        public OpenFolderResult(File directory, String folderName, boolean inPlace, int copiedFileCount, String treeUriString) {
             this.directory = directory;
             this.folderName = folderName;
             this.inPlace = inPlace;
             this.copiedFileCount = copiedFileCount;
+            this.treeUriString = treeUriString != null ? treeUriString : "";
         }
 
         public File getDirectory() { return directory; }
         public String getFolderName() { return folderName; }
         public boolean isInPlace() { return inPlace; }
         public int getCopiedFileCount() { return copiedFileCount; }
+        public String getTreeUriString() { return treeUriString; }
     }
 
     public String extractFolderName(Uri treeUri) {
@@ -236,40 +243,65 @@ public class SafFileManager {
         return null;
     }
 
+    public boolean isDirectlyAccessible(File directFile, DocumentFile rootDoc) {
+        if (directFile == null || !directFile.exists() || !directFile.isDirectory()) {
+            return false;
+        }
+        if (!directFile.canRead() || !directFile.canWrite()) {
+            return false;
+        }
+
+        try {
+            DocumentFile[] safChildren = rootDoc != null ? rootDoc.listFiles() : null;
+            File[] localChildren = directFile.listFiles();
+            // If SAF sees files, but direct POSIX File sees 0 files, Scoped Storage is blocking raw File access
+            if (safChildren != null && safChildren.length > 0) {
+                if (localChildren == null || localChildren.length == 0) {
+                    Log.w(TAG, "POSIX File sees 0 files while SAF has " + safChildren.length + " items. Bypassing in-place direct access.");
+                    return false;
+                }
+            }
+
+            // Probe write permission (critical for Git index, objects, lockfiles)
+            File probe = new File(directFile, ".repostudio_probe_" + System.currentTimeMillis());
+            if (probe.createNewFile()) {
+                probe.delete();
+                return true;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Direct write probe failed for " + directFile.getAbsolutePath() + ": " + e.getMessage());
+        }
+        return false;
+    }
+
     public OpenFolderResult openFolder(Uri treeUri) throws IOException {
         if (treeUri == null) {
             throw new IOException("Storage URI cannot be null");
         }
 
         String realFolderName = extractFolderName(treeUri);
+        DocumentFile rootDoc = DocumentFile.fromTreeUri(context, treeUri);
         File directFile = resolveDirectFile(treeUri);
 
-        // If direct filesystem file exists and is accessible, use it directly in-place without copying!
-        if (directFile != null && directFile.exists() && directFile.isDirectory()) {
-            try {
-                File[] testList = directFile.listFiles();
-                if (testList != null) {
-                    Log.i(TAG, "Successfully opened folder in-place without importing: " + directFile.getAbsolutePath());
-                    return new OpenFolderResult(directFile, realFolderName, true, 0);
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "Direct read check failed for " + directFile.getAbsolutePath() + ": " + e.getMessage());
-            }
+        // Check if direct filesystem file exists, can list files, and is writable
+        if (isDirectlyAccessible(directFile, rootDoc)) {
+            Log.i(TAG, "Successfully opened folder in-place: " + directFile.getAbsolutePath());
+            return new OpenFolderResult(directFile, realFolderName, true, 0, treeUri.toString());
         }
 
-        // Fallback: If direct file access is blocked by OS scoped storage, copy into app project dir named with realFolderName
-        Log.i(TAG, "Falling back to local copy for " + realFolderName);
+        // If direct file access is blocked by Scoped Storage, copy files into app's repository workspace
+        // using the exact folder name selected by the user!
+        Log.i(TAG, "Loading files from SAF for: " + realFolderName);
         String cleanName = realFolderName.replaceAll("[^a-zA-Z0-9_.-]", "_");
         if (cleanName.trim().isEmpty()) cleanName = "Project";
         File targetDir = new File(baseProjectsDir, cleanName);
-        int idx = 1;
-        while (targetDir.exists()) {
-            targetDir = new File(baseProjectsDir, cleanName + "_" + idx++);
+        if (!targetDir.exists()) {
+            targetDir.mkdirs();
         }
-        targetDir.mkdirs();
 
         int count = importFromSafTree(treeUri, targetDir);
-        return new OpenFolderResult(targetDir, realFolderName, false, count);
+        Log.i(TAG, "Successfully loaded " + count + " files into " + targetDir.getAbsolutePath());
+        return new OpenFolderResult(targetDir, realFolderName, false, count, treeUri.toString());
     }
 
     public int importFromSafTree(Uri treeUri, File targetDir) throws IOException {
@@ -277,7 +309,9 @@ public class SafFileManager {
         if (rootDoc == null || !rootDoc.isDirectory()) {
             throw new IOException("Selected storage location is not accessible as a directory.");
         }
-        if (!targetDir.exists()) targetDir.mkdirs();
+        if (!targetDir.exists() && !targetDir.mkdirs()) {
+            throw new IOException("Could not create local repository directory: " + targetDir.getAbsolutePath());
+        }
 
         return copyDocFolderToLocal(rootDoc, targetDir);
     }
@@ -285,28 +319,95 @@ public class SafFileManager {
     private int copyDocFolderToLocal(DocumentFile docFolder, File localDir) throws IOException {
         int count = 0;
         DocumentFile[] files = docFolder.listFiles();
+        if (files == null) return 0;
+
         for (DocumentFile doc : files) {
             String name = doc.getName();
-            if (name == null || DEFAULT_EXCLUDED_DIRS.contains(name)) continue;
+            if (name == null || name.trim().isEmpty() || EXCLUDED_FROM_SYNC.contains(name)) {
+                continue;
+            }
 
             if (doc.isDirectory()) {
                 File subDir = new File(localDir, name);
-                if (!subDir.exists()) subDir.mkdirs();
+                if (!subDir.exists() && !subDir.mkdirs()) {
+                    Log.w(TAG, "Failed to create directory: " + subDir.getAbsolutePath());
+                }
                 count += copyDocFolderToLocal(doc, subDir);
-            } else if (doc.isFile()) {
+            } else {
+                // Regular file! We do NOT rely on doc.isFile() because TreeDocumentFile.isFile()
+                // returns false when MIME type is null or unrecognized by Android for code files.
                 File localFile = new File(localDir, name);
-                try (InputStream in = context.getContentResolver().openInputStream(doc.getUri());
-                     OutputStream out = new FileOutputStream(localFile)) {
-                    if (in != null) {
-                        byte[] buf = new byte[8192];
-                        int len;
-                        while ((len = in.read(buf)) > 0) {
-                            out.write(buf, 0, len);
+                if (copyDocFile(doc, localFile)) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private boolean copyDocFile(DocumentFile doc, File localFile) {
+        try (InputStream in = context.getContentResolver().openInputStream(doc.getUri());
+             OutputStream out = new FileOutputStream(localFile)) {
+            if (in != null) {
+                byte[] buf = new byte[16384];
+                int len;
+                while ((len = in.read(buf)) > 0) {
+                    out.write(buf, 0, len);
+                }
+                out.flush();
+                return true;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to copy file " + doc.getName() + ": " + e.getMessage());
+        }
+        return false;
+    }
+
+    public int exportToSafTree(File localDir, Uri treeUri) throws IOException {
+        DocumentFile rootDoc = DocumentFile.fromTreeUri(context, treeUri);
+        if (rootDoc == null || !rootDoc.isDirectory()) {
+            throw new IOException("Target storage location is not accessible as a directory");
+        }
+        return syncLocalFolderToSaf(localDir, rootDoc);
+    }
+
+    private int syncLocalFolderToSaf(File localDir, DocumentFile targetDoc) {
+        int count = 0;
+        File[] files = localDir.listFiles();
+        if (files == null) return 0;
+
+        for (File file : files) {
+            String name = file.getName();
+            if (name == null || EXCLUDED_FROM_SYNC.contains(name)) continue;
+
+            if (file.isDirectory()) {
+                DocumentFile subDoc = targetDoc.findFile(name);
+                if (subDoc == null || !subDoc.isDirectory()) {
+                    subDoc = targetDoc.createDirectory(name);
+                }
+                if (subDoc != null) {
+                    count += syncLocalFolderToSaf(file, subDoc);
+                }
+            } else if (file.isFile()) {
+                DocumentFile fileDoc = targetDoc.findFile(name);
+                if (fileDoc == null) {
+                    fileDoc = targetDoc.createFile("application/octet-stream", name);
+                }
+                if (fileDoc != null) {
+                    try (InputStream in = new FileInputStream(file);
+                         OutputStream out = context.getContentResolver().openOutputStream(fileDoc.getUri(), "wt")) {
+                        if (out != null) {
+                            byte[] buf = new byte[16384];
+                            int len;
+                            while ((len = in.read(buf)) > 0) {
+                                out.write(buf, 0, len);
+                            }
+                            out.flush();
+                            count++;
                         }
-                        count++;
+                    } catch (Exception e) {
+                        Log.w(TAG, "Failed to write file back to SAF: " + name + ": " + e.getMessage());
                     }
-                } catch (Exception e) {
-                    Log.w(TAG, "Failed to copy file " + name + ": " + e.getMessage());
                 }
             }
         }

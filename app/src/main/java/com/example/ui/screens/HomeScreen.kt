@@ -44,6 +44,7 @@ fun HomeScreen(
     onPush: () -> Unit,
     onPull: () -> Unit,
     onOpenFolder: () -> Unit = {},
+    onSyncToFolder: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -203,7 +204,7 @@ fun HomeScreen(
                         }
                     } else {
                         Text(
-                            text = "No repository currently open. Select any project folder from your device directly in-place without importing.",
+                            text = "No repository currently open. Select any project folder from your device storage to view files, commit, and push.",
                             fontSize = 12.sp,
                             color = GitHubTextSecondary
                         )
@@ -211,11 +212,13 @@ fun HomeScreen(
                         Button(
                             onClick = onOpenFolder,
                             colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("home_open_device_folder_button")
                         ) {
                             Icon(Icons.Default.FolderOpen, contentDescription = null, tint = Color.White)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Open Device Folder (In-Place)", fontWeight = FontWeight.Bold)
+                            Text("Open Device Folder", fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -224,11 +227,29 @@ fun HomeScreen(
                         Button(
                             onClick = onInitGit,
                             colors = ButtonDefaults.buttonColors(containerColor = GitHubBlue),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().testTag("home_init_git_button")
                         ) {
                             Icon(Icons.Default.PlayArrow, contentDescription = null)
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Initialize Git in this Project")
+                        }
+                    }
+
+                    if (activeRepo != null && activeRepo.safTreeUri.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = onSyncToFolder,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = GitHubGreen),
+                            border = CardDefaults.outlinedCardBorder().copy(
+                                brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("home_sync_folder_button")
+                        ) {
+                            Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Sync Changes to Device Folder", fontSize = 13.sp)
                         }
                     }
                 }

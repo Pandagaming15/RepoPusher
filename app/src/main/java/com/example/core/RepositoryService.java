@@ -162,12 +162,13 @@ public class RepositoryService {
         String remote = isGit ? gitEngine.getRemoteUrl(dir, "origin") : "";
 
         LocalRepository repo = new LocalRepository(folderName, dir.getAbsolutePath(), remote, branch, isGit);
+        repo.setSafTreeUri(res.getTreeUriString());
         setActiveRepository(repo);
 
         if (res.isInPlace()) {
-            logOperation("Open Folder", folderName, "Opened directory in-place: " + dir.getAbsolutePath() + (isGit ? " (Git detected)" : " (No Git yet)"), OperationLog.Level.SUCCESS);
+            logOperation("Open Folder", folderName, "Opened folder in-place: " + dir.getAbsolutePath() + (isGit ? " (Git detected)" : " (No Git yet)"), OperationLog.Level.SUCCESS);
         } else {
-            logOperation("Import Folder", folderName, "Imported " + res.getCopiedFileCount() + " files into: " + dir.getAbsolutePath(), OperationLog.Level.SUCCESS);
+            logOperation("Open Folder", folderName, "Loaded " + res.getCopiedFileCount() + " files into: " + dir.getAbsolutePath() + (isGit ? " (Git detected)" : " (No Git yet)"), OperationLog.Level.SUCCESS);
         }
 
         return repo;

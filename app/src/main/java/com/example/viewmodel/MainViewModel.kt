@@ -12,6 +12,8 @@ import com.example.core.models.GitHubUser
 import com.example.core.models.LocalRepository
 import com.example.core.models.OperationLog
 import com.example.core.models.ProjectFile
+import com.example.data.local.AppDatabase
+import com.example.data.local.LocalRepoRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +32,7 @@ enum class NavigationTab {
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repoService = RepositoryService.getInstance(application)
+    private val roomRepo = LocalRepoRepository(AppDatabase.getDatabase(application).localRepoDao())
 
     private val _currentTab = MutableStateFlow(NavigationTab.HOME)
     val currentTab: StateFlow<NavigationTab> = _currentTab.asStateFlow()
@@ -79,6 +82,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         refreshAll()
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                repoService.allLocalRepositories.forEach { lr ->
+                    roomRepo.insertOrUpdate(
+                        path = lr.path,
+                        name = lr.name,
+                        remoteUrl = lr.remoteUrl,
+                        branch = lr.currentBranch,
+                        safTreeUri = lr.safTreeUri
+                    )
+                }
+            } catch (ignored: Exception) {}
+        }
     }
 
     fun setTab(tab: NavigationTab) {
@@ -385,6 +401,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _activeRepo.value = newRepo
                     _localRepos.value = repoService.allLocalRepositories
                     refreshCurrentRepoData()
+                    try {
+                        roomRepo.insertOrUpdate(newRepo.path, newRepo.name, newRepo.remoteUrl, newRepo.currentBranch)
+                    } catch (ignored: Exception) {}
                     _statusMessage.value = "Project $name created with $templateType template"
                 } catch (e: Exception) {
                     _errorMessage.value = "Failed to create project: ${e.message}"
@@ -405,9 +424,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _activeRepo.value = repo
                     _localRepos.value = repoService.allLocalRepositories
                     refreshCurrentRepoData()
-                    _statusMessage.value = "Opened '${repo.name}' (${if (repo.isGitInitialized) "Git branch: ${repo.currentBranch}" else "ready to initialize"})"
+                    try {
+                        roomRepo.insertOrUpdate(repo.path, repo.name, repo.remoteUrl, repo.currentBranch, repo.safTreeUri)
+                    } catch (ignored: Exception) {}
+                    val filesCount = _projectFiles.value.size
+                    _statusMessage.value = "Opened '${repo.name}' ($filesCount project files loaded, ${if (repo.isGitInitialized) "branch: ${repo.currentBranch}" else "ready to initialize"})"
                 } catch (e: Exception) {
                     _errorMessage.value = "Failed to open folder: ${e.message}"
+                } finally {
+                    _operationLogs.value = repoService.operationLogs
+                    _isLoading.value = false
+                }
+            }
+        }
+    }
+
+    fun syncActiveRepoToDeviceFolder() {
+        val repo = repoService.activeRepository ?: return
+        if (repo.safTreeUri.isNullOrBlank()) {
+            _errorMessage.value = "This repository was not opened from a device storage folder"
+            return
+        }
+        viewModelScope.launch {
+            _isLoading.value = true
+            withContext(Dispatchers.IO) {
+                try {
+                    val count = repoService.safFileManager.exportToSafTree(File(repo.path), Uri.parse(repo.safTreeUri))
+                    _statusMessage.value = "Exported/synced $count files back to device storage"
+                    repoService.logOperation("Sync to Storage", repo.name, "Synced $count files back to device storage", OperationLog.Level.SUCCESS)
+                } catch (e: Exception) {
+                    _errorMessage.value = "Sync back to storage failed: ${e.message}"
                 } finally {
                     _operationLogs.value = repoService.operationLogs
                     _isLoading.value = false
@@ -433,6 +479,50 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun openRepositoryByPath(path: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            withContext(Dispatchers.IO) {
+                try {
+                    val file = File(path)
+                    if (!file.exists()) {
+                        _errorMessage.value = "Path does not exist on device: $path"
+                        return@withContext
+                    }
+                    val isGit = File(file, ".git").exists()
+                    val branch = if (isGit) {
+                        try {
+                            repoService.gitEngine.getCurrentBranch(file)
+                        } catch (e: Exception) {
+                            "main"
+                        }
+                    } else "main"
+                    val remote = if (isGit) {
+                        try {
+                            repoService.gitEngine.getRemoteUrl(file, "origin")
+                        } catch (e: Exception) {
+                            ""
+                        }
+                    } else ""
+                    val repo = LocalRepository(file.name, file.absolutePath, remote, branch, isGit)
+                    repoService.activeRepository = repo
+                    _activeRepo.value = repo
+                    _localRepos.value = repoService.allLocalRepositories
+                    refreshCurrentRepoData()
+                    try {
+                        roomRepo.updateLastAccessed(path)
+                    } catch (ignored: Exception) {}
+                    _statusMessage.value = "Active repository set to ${repo.name}"
+                    _currentTab.value = NavigationTab.HOME
+                } catch (e: Exception) {
+                    _errorMessage.value = "Failed to open repository at $path: ${e.message}"
+                } finally {
+                    _isLoading.value = false
+                }
+            }
+        }
+    }
+
     fun cloneRemoteRepo(cloneUrl: String, repoName: String) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -447,6 +537,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _activeRepo.value = newRepo
                     _localRepos.value = repoService.allLocalRepositories
                     refreshCurrentRepoData()
+                    try {
+                        roomRepo.insertOrUpdate(newRepo.path, newRepo.name, newRepo.remoteUrl, newRepo.currentBranch)
+                    } catch (ignored: Exception) {}
                     _statusMessage.value = "Cloned $clean successfully"
                 } catch (e: Exception) {
                     _errorMessage.value = "Clone failed: ${e.message}"

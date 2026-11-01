@@ -167,7 +167,8 @@ class MainActivity : ComponentActivity() {
                                     onOpenFiles = { showProjectFilesDialog = true },
                                     onPush = { viewModel.push() },
                                     onPull = { viewModel.pull() },
-                                    onOpenFolder = { safLauncher.launch(null) }
+                                    onOpenFolder = { safLauncher.launch(null) },
+                                    onSyncToFolder = { viewModel.syncActiveRepoToDeviceFolder() }
                                 )
                             }
                             NavigationTab.REPOSITORIES -> {
@@ -188,7 +189,8 @@ class MainActivity : ComponentActivity() {
                                     onViewReadme = { owner, repo ->
                                         viewModel.showReadme(owner, repo)
                                     },
-                                    onNavigateSettings = { viewModel.setTab(NavigationTab.SETTINGS) }
+                                    onNavigateSettings = { viewModel.setTab(NavigationTab.SETTINGS) },
+                                    onOpenRepositoryPath = { path -> viewModel.openRepositoryByPath(path) }
                                 )
                             }
                             NavigationTab.CHANGES -> {
