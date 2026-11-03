@@ -7,6 +7,7 @@ val GitHubDarkBackground = Color(0xFF0D1117)
 val GitHubDarkSurface = Color(0xFF161B22)
 val GitHubDarkSurfaceVariant = Color(0xFF21262D)
 val GitHubDarkBorder = Color(0xFF30363D)
+val GitHubDarkCard = Color(0xFF21262D)
 
 // Accents
 val GitHubGreen = Color(0xFF2EA043)

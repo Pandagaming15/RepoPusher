@@ -1,6 +1,6 @@
 package com.example.ui.components
 
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -21,13 +21,10 @@ fun AppBottomNav(
     modifier: Modifier = Modifier
 ) {
     NavigationBar(
-        modifier = modifier
-            .navigationBarsPadding()
-            .testTag("bottom_nav_bar"),
+        modifier = modifier.testTag("app_bottom_nav"),
         containerColor = GitHubDarkSurface,
-        tonalElevation = 6.dp
+        tonalElevation = 8.dp
     ) {
-        // HOME
         NavigationBarItem(
             selected = currentTab == NavigationTab.HOME,
             onClick = { onTabSelected(NavigationTab.HOME) },
@@ -36,30 +33,28 @@ fun AppBottomNav(
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = GitHubGreen,
                 selectedTextColor = GitHubGreen,
-                indicatorColor = GitHubDarkSurfaceVariant,
                 unselectedIconColor = GitHubTextSecondary,
-                unselectedTextColor = GitHubTextSecondary
+                unselectedTextColor = GitHubTextSecondary,
+                indicatorColor = GitHubDarkSurfaceVariant
             ),
-            modifier = Modifier.testTag("nav_item_home")
+            modifier = Modifier.testTag("nav_tab_home")
         )
 
-        // REPOSITORIES
         NavigationBarItem(
             selected = currentTab == NavigationTab.REPOSITORIES,
             onClick = { onTabSelected(NavigationTab.REPOSITORIES) },
-            icon = { Icon(Icons.Default.FolderCopy, contentDescription = "Repositories") },
-            label = { Text("Repos", fontSize = 11.sp) },
+            icon = { Icon(Icons.Default.Folder, contentDescription = "Repositories") },
+            label = { Text("Repositories", fontSize = 11.sp) },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = GitHubGreen,
                 selectedTextColor = GitHubGreen,
-                indicatorColor = GitHubDarkSurfaceVariant,
                 unselectedIconColor = GitHubTextSecondary,
-                unselectedTextColor = GitHubTextSecondary
+                unselectedTextColor = GitHubTextSecondary,
+                indicatorColor = GitHubDarkSurfaceVariant
             ),
-            modifier = Modifier.testTag("nav_item_repositories")
+            modifier = Modifier.testTag("nav_tab_repositories")
         )
 
-        // CHANGES
         NavigationBarItem(
             selected = currentTab == NavigationTab.CHANGES,
             onClick = { onTabSelected(NavigationTab.CHANGES) },
@@ -76,37 +71,35 @@ fun AppBottomNav(
                         }
                     }
                 ) {
-                    Icon(Icons.Default.Difference, contentDescription = "Changes")
+                    Icon(Icons.Default.Commit, contentDescription = "Changes")
                 }
             },
             label = { Text("Changes", fontSize = 11.sp) },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = GitHubGreen,
                 selectedTextColor = GitHubGreen,
-                indicatorColor = GitHubDarkSurfaceVariant,
                 unselectedIconColor = GitHubTextSecondary,
-                unselectedTextColor = GitHubTextSecondary
+                unselectedTextColor = GitHubTextSecondary,
+                indicatorColor = GitHubDarkSurfaceVariant
             ),
-            modifier = Modifier.testTag("nav_item_changes")
+            modifier = Modifier.testTag("nav_tab_changes")
         )
 
-        // ACTIVITY
         NavigationBarItem(
             selected = currentTab == NavigationTab.ACTIVITY,
             onClick = { onTabSelected(NavigationTab.ACTIVITY) },
-            icon = { Icon(Icons.Default.Terminal, contentDescription = "Activity") },
+            icon = { Icon(Icons.Default.History, contentDescription = "Activity") },
             label = { Text("Activity", fontSize = 11.sp) },
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = GitHubGreen,
                 selectedTextColor = GitHubGreen,
-                indicatorColor = GitHubDarkSurfaceVariant,
                 unselectedIconColor = GitHubTextSecondary,
-                unselectedTextColor = GitHubTextSecondary
+                unselectedTextColor = GitHubTextSecondary,
+                indicatorColor = GitHubDarkSurfaceVariant
             ),
-            modifier = Modifier.testTag("nav_item_activity")
+            modifier = Modifier.testTag("nav_tab_activity")
         )
 
-        // SETTINGS
         NavigationBarItem(
             selected = currentTab == NavigationTab.SETTINGS,
             onClick = { onTabSelected(NavigationTab.SETTINGS) },
@@ -115,11 +108,11 @@ fun AppBottomNav(
             colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = GitHubGreen,
                 selectedTextColor = GitHubGreen,
-                indicatorColor = GitHubDarkSurfaceVariant,
                 unselectedIconColor = GitHubTextSecondary,
-                unselectedTextColor = GitHubTextSecondary
+                unselectedTextColor = GitHubTextSecondary,
+                indicatorColor = GitHubDarkSurfaceVariant
             ),
-            modifier = Modifier.testTag("nav_item_settings")
+            modifier = Modifier.testTag("nav_tab_settings")
         )
     }
 }

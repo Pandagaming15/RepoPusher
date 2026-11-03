@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -61,33 +62,26 @@ fun HomeScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(140.dp)
+                    .height(130.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .testTag("home_hero_banner"),
-                colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface)
+                colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
+                border = CardDefaults.outlinedCardBorder().copy(
+                    brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder)
+                )
             ) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    Image(
-                        painter = painterResource(id = R.drawable.hero_git_banner_1793452534370),
-                        contentDescription = "RepoStudio Banner",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                    listOf(Color(0xEE0D1117), Color(0x770D1117), Color.Transparent)
-                                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                listOf(Color(0xFF0F2B1D), Color(0xFF161B22))
                             )
-                    )
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.Center
-                    ) {
+                        )
+                        .padding(16.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Column {
                         Surface(
                             shape = RoundedCornerShape(4.dp),
                             color = GitHubGreenDark
@@ -100,17 +94,17 @@ fun HomeScreen(
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "RepoStudio",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = GitHubTextPrimary
                         )
                         Text(
-                            text = "Manage, commit, and publish Git repositories natively.",
-                            fontSize = 11.sp,
-                            color = GitHubTextPrimary
+                            text = "Lightweight GitHub Desktop for Android",
+                            fontSize = 12.sp,
+                            color = GitHubTextSecondary
                         )
                     }
                 }
@@ -120,10 +114,14 @@ fun HomeScreen(
         // Active Repository Card
         item {
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("home_active_repo_card"),
                 shape = RoundedCornerShape(16.dp),
-                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
+                colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
+                border = CardDefaults.outlinedCardBorder().copy(
+                    brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder)
+                )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
@@ -286,179 +284,139 @@ fun HomeScreen(
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Scan files, create repo, commit and push in 1 easy step",
-                            color = Color(0xDDFFFFFF),
+                            text = "Stage, commit, create repo and push in one guided flow",
+                            color = Color(0xCCFFFFFF),
                             fontSize = 12.sp
                         )
                     }
                     Icon(
                         imageVector = Icons.Default.ArrowForward,
-                        contentDescription = "Publish",
+                        contentDescription = null,
                         tint = Color.White
                     )
                 }
             }
         }
 
-        // Quick Action Grid
+        // Quick Actions Grid
         item {
             Text(
-                text = "Quick Actions",
+                text = "Repository Operations",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = GitHubTextPrimary
+                color = GitHubTextSecondary,
+                modifier = Modifier.padding(vertical = 4.dp)
             )
-            Spacer(modifier = Modifier.height(8.dp))
 
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Card(
-                    onClick = { onNavigateTab(NavigationTab.CHANGES) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 4.dp),
-                    colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Icon(Icons.Default.Difference, contentDescription = null, tint = GitHubGreen)
-                            if (changesCount > 0) {
-                                Surface(shape = RoundedCornerShape(8.dp), color = GitHubGreen) {
-                                    Text("$changesCount", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("View Changes", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = GitHubTextPrimary)
-                        Text("Stage & Commit", fontSize = 11.sp, color = GitHubTextMuted)
-                    }
-                }
-
-                Card(
-                    onClick = onPush,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 4.dp),
-                    colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Icon(Icons.Default.Upload, contentDescription = null, tint = GitHubBlue)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("Push to Remote", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = GitHubTextPrimary)
-                        Text("Send local commits", fontSize = 11.sp, color = GitHubTextMuted)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Card(
-                    onClick = onPull,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 4.dp),
-                    colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Icon(Icons.Default.Download, contentDescription = null, tint = GitHubPurple)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("Pull Changes", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = GitHubTextPrimary)
-                        Text("Fetch & integrate", fontSize = 11.sp, color = GitHubTextMuted)
-                    }
-                }
-
-                Card(
-                    onClick = onOpenCommitHistory,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 4.dp),
-                    colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Icon(Icons.Default.History, contentDescription = null, tint = GitHubOrange)
-                            if (commitCount > 0) {
-                                Surface(shape = RoundedCornerShape(8.dp), color = GitHubDarkSurfaceVariant) {
-                                    Text("$commitCount", color = GitHubTextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("Commit History", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = GitHubTextPrimary)
-                        Text("View commit log", fontSize = 11.sp, color = GitHubTextMuted)
-                    }
-                }
-            }
-        }
-
-        // Repository Storage Stats Card
-        item {
-            Card(
-                onClick = onOpenFiles,
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-                shape = RoundedCornerShape(16.dp),
-                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Row(
+                Card(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .weight(1f)
+                        .clickable { onNavigateTab(NavigationTab.CHANGES) }
+                        .testTag("home_quick_action_changes"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder)
+                    )
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.FolderOpen, contentDescription = null, tint = GitHubGreen)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text("Project Files", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = GitHubTextPrimary)
-                            Text("${projectFiles.size} files in local working tree", fontSize = 12.sp, color = GitHubTextMuted)
-                        }
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Icon(Icons.Default.Commit, contentDescription = null, tint = GitHubGreen, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Changes", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = GitHubTextPrimary)
+                        Text("$changesCount pending", fontSize = 11.sp, color = GitHubTextSecondary)
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Browse", fontSize = 12.sp, color = GitHubGreen, fontWeight = FontWeight.SemiBold)
-                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = GitHubGreen)
+                }
+
+                Card(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onOpenFiles() }
+                        .testTag("home_quick_action_files"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Icon(Icons.Default.Description, contentDescription = null, tint = GitHubBlue, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Project Files", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = GitHubTextPrimary)
+                        Text("${projectFiles.size} files", fontSize = 11.sp, color = GitHubTextSecondary)
+                    }
+                }
+
+                Card(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onOpenCommitHistory() }
+                        .testTag("home_quick_action_history"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Icon(Icons.Default.History, contentDescription = null, tint = GitHubPurple, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("History", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = GitHubTextPrimary)
+                        Text("$commitCount commits", fontSize = 11.sp, color = GitHubTextSecondary)
                     }
                 }
             }
         }
 
-        // Recent Activity Preview
+        // Push / Pull Row
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = "Recent Operations",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = GitHubTextPrimary
-                )
-                Text(
-                    text = "View All",
-                    fontSize = 12.sp,
-                    color = GitHubBlue,
-                    modifier = Modifier.clickable { onNavigateTab(NavigationTab.ACTIVITY) }
-                )
+                Button(
+                    onClick = onPush,
+                    colors = ButtonDefaults.buttonColors(containerColor = GitHubDarkSurfaceVariant),
+                    modifier = Modifier.weight(1f).testTag("home_push_button")
+                ) {
+                    Icon(Icons.Default.Upload, contentDescription = null, tint = GitHubGreen, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Push", color = GitHubTextPrimary)
+                }
+
+                Button(
+                    onClick = onPull,
+                    colors = ButtonDefaults.buttonColors(containerColor = GitHubDarkSurfaceVariant),
+                    modifier = Modifier.weight(1f).testTag("home_pull_button")
+                ) {
+                    Icon(Icons.Default.Download, contentDescription = null, tint = GitHubBlue, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Pull", color = GitHubTextPrimary)
+                }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // Recent Operations Section
+        item {
+            Text(
+                text = "Recent Git Activity",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = GitHubTextSecondary,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
 
             if (recentLogs.isEmpty()) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder)
+                    )
                 ) {
                     Text(
                         text = "No recent operations logged.",
@@ -468,39 +426,54 @@ fun HomeScreen(
                     )
                 }
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    recentLogs.take(4).forEach { log ->
-                        val badgeColor = when (log.level) {
-                            OperationLog.Level.SUCCESS -> GitHubGreen
-                            OperationLog.Level.ERROR -> GitHubRed
-                            OperationLog.Level.WARNING -> GitHubOrange
-                            else -> GitHubBlue
-                        }
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface)
-                        ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        recentLogs.take(5).forEach { log ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                    .padding(vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Surface(shape = RoundedCornerShape(4.dp), color = badgeColor) {
-                                        Box(modifier = Modifier.size(8.dp))
-                                    }
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Column {
-                                        Text(log.operation, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = GitHubTextPrimary)
-                                        Text(log.details, fontSize = 11.sp, color = GitHubTextMuted, maxLines = 1)
-                                    }
+                                val color = when (log.level) {
+                                    OperationLog.Level.SUCCESS -> GitHubGreen
+                                    OperationLog.Level.ERROR -> GitHubRed
+                                    OperationLog.Level.WARNING -> GitHubOrange
+                                    else -> GitHubBlue
                                 }
-                                Text(log.formattedTime, fontSize = 10.sp, color = GitHubTextMuted)
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = color.copy(alpha = 0.2f)
+                                ) {
+                                    Text(
+                                        text = log.operation,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = color,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = log.details,
+                                    fontSize = 11.sp,
+                                    color = GitHubTextPrimary,
+                                    maxLines = 1,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = log.formattedTime,
+                                    fontSize = 10.sp,
+                                    color = GitHubTextMuted
+                                )
                             }
                         }
                     }

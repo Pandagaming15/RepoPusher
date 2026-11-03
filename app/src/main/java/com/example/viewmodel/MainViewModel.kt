@@ -5,13 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core.RepositoryService
-import com.example.core.models.GitCommitInfo
-import com.example.core.models.GitFileStatus
-import com.example.core.models.GitHubRepo
-import com.example.core.models.GitHubUser
-import com.example.core.models.LocalRepository
-import com.example.core.models.OperationLog
-import com.example.core.models.ProjectFile
+import com.example.core.models.*
 import com.example.data.local.AppDatabase
 import com.example.data.local.LocalRepoRepository
 import kotlinx.coroutines.Dispatchers
@@ -22,15 +16,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-enum class NavigationTab {
-    HOME,
-    REPOSITORIES,
-    CHANGES,
-    ACTIVITY,
-    SETTINGS
-}
-
 class MainViewModel(application: Application) : AndroidViewModel(application) {
+
     private val repoService = RepositoryService.getInstance(application)
     private val roomRepo = LocalRepoRepository(AppDatabase.getDatabase(application).localRepoDao())
 
@@ -73,28 +60,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    // Dialog & Detail states
-    private val _diffDialogData = MutableStateFlow<Pair<String, String>?>(null) // (File, DiffText)
+    private val _diffDialogData = MutableStateFlow<Pair<String, String>?>(null)
     val diffDialogData: StateFlow<Pair<String, String>?> = _diffDialogData.asStateFlow()
 
-    private val _readmeDialogData = MutableStateFlow<Pair<String, String>?>(null) // (RepoName, Content)
+    private val _readmeDialogData = MutableStateFlow<Pair<String, String>?>(null)
     val readmeDialogData: StateFlow<Pair<String, String>?> = _readmeDialogData.asStateFlow()
 
     init {
         refreshAll()
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                repoService.allLocalRepositories.forEach { lr ->
-                    roomRepo.insertOrUpdate(
-                        path = lr.path,
-                        name = lr.name,
-                        remoteUrl = lr.remoteUrl,
-                        branch = lr.currentBranch,
-                        safTreeUri = lr.safTreeUri
-                    )
-                }
-            } catch (ignored: Exception) {}
-        }
+        loadGitHubUserAndRepos()
     }
 
     fun setTab(tab: NavigationTab) {
@@ -107,505 +81,372 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshAll() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    repoService.refreshActiveRepoInfo()
-                    _activeRepo.value = repoService.activeRepository
-                    _localRepos.value = repoService.allLocalRepositories
-                    _operationLogs.value = repoService.operationLogs
-
-                    refreshCurrentRepoData()
-                    loadGitHubUserAndRepos()
-                } catch (e: Exception) {
-                    _errorMessage.value = e.message
-                } finally {
-                    _isLoading.value = false
-                }
+        viewModelScope.launch(Dispatchers.IO) {
+            _localRepos.value = repoService.allLocalRepositories
+            _operationLogs.value = repoService.operationLogs
+            val active = repoService.activeRepository
+            _activeRepo.value = active
+            if (active != null) {
+                refreshCurrentRepoData()
             }
         }
     }
 
-    private fun refreshCurrentRepoData() {
-        val repo = repoService.activeRepository ?: return
-        val dir = File(repo.path)
-        if (dir.exists()) {
-            // Scan project files
-            val files = repoService.safFileManager.scanProjectFiles(dir, null)
-            _projectFiles.value = files
-
-            // Git data
+    fun refreshCurrentRepoData() {
+        val active = repoService.activeRepository ?: return
+        val dir = File(active.path)
+        try {
+            _projectFiles.value = repoService.safFileManager.scanProjectFiles(dir, emptySet())
             if (repoService.gitEngine.isGitRepository(dir)) {
-                _gitChanges.value = repoService.gitEngine.getStatus(dir)
+                _gitChanges.value = repoService.activeRepoStatus
                 _commitHistory.value = repoService.gitEngine.getCommitHistory(dir, 50)
                 _branches.value = repoService.gitEngine.getBranches(dir)
+                val currentB = repoService.gitEngine.getCurrentBranch(dir)
+                active.currentBranch = currentB
+                _activeRepo.value = active
             } else {
                 _gitChanges.value = emptyList()
                 _commitHistory.value = emptyList()
                 _branches.value = listOf("main")
             }
+        } catch (e: Exception) {
+            // Non-fatal error during data scan
         }
     }
 
     fun selectRepository(repo: LocalRepository) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                repoService.activeRepository = repo
-                _activeRepo.value = repo
-                refreshCurrentRepoData()
-                _operationLogs.value = repoService.operationLogs
-            }
-            _isLoading.value = false
+        viewModelScope.launch(Dispatchers.IO) {
+            repoService.activeRepository = repo
+            _activeRepo.value = repo
+            refreshCurrentRepoData()
+            _operationLogs.value = repoService.operationLogs
         }
     }
 
     fun initGit() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    repoService.initGitInActiveRepo()
-                    _activeRepo.value = repoService.activeRepository
-                    refreshCurrentRepoData()
-                    _statusMessage.value = "Git initialized successfully"
-                } catch (e: Exception) {
-                    _errorMessage.value = "Failed to init Git: ${e.message}"
-                } finally {
-                    _operationLogs.value = repoService.operationLogs
-                    _isLoading.value = false
-                }
+            try {
+                repoService.initGitInActiveRepo()
+                refreshCurrentRepoData()
+                _statusMessage.value = "Git repository initialized successfully"
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to initialize Git: ${e.message}"
+            } finally {
+                _isLoading.value = false
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
 
     fun stageFile(pattern: String) {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                try {
-                    repoService.stageFile(pattern)
-                    refreshCurrentRepoData()
-                } catch (e: Exception) {
-                    _errorMessage.value = "Failed to stage: ${e.message}"
-                } finally {
-                    _operationLogs.value = repoService.operationLogs
-                }
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                repoService.stageFile(pattern)
+                _gitChanges.value = repoService.activeRepoStatus
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to stage file: ${e.message}"
+            } finally {
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
 
     fun stageAll() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    repoService.stageAll()
-                    refreshCurrentRepoData()
-                    _statusMessage.value = "All changes staged"
-                } catch (e: Exception) {
-                    _errorMessage.value = "Failed to stage all: ${e.message}"
-                } finally {
-                    _operationLogs.value = repoService.operationLogs
-                    _isLoading.value = false
-                }
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                repoService.stageAll()
+                _gitChanges.value = repoService.activeRepoStatus
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to stage all: ${e.message}"
+            } finally {
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
 
     fun unstageFile(pattern: String) {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                try {
-                    repoService.unstageFile(pattern)
-                    refreshCurrentRepoData()
-                } catch (e: Exception) {
-                    _errorMessage.value = "Failed to unstage: ${e.message}"
-                } finally {
-                    _operationLogs.value = repoService.operationLogs
-                }
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                repoService.unstageFile(pattern)
+                _gitChanges.value = repoService.activeRepoStatus
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to unstage: ${e.message}"
+            } finally {
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
 
     fun unstageAll() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    repoService.unstageAll()
-                    refreshCurrentRepoData()
-                    _statusMessage.value = "All changes unstaged"
-                } catch (e: Exception) {
-                    _errorMessage.value = "Failed to unstage all: ${e.message}"
-                } finally {
-                    _operationLogs.value = repoService.operationLogs
-                    _isLoading.value = false
-                }
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                repoService.unstageAll()
+                _gitChanges.value = repoService.activeRepoStatus
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to unstage all: ${e.message}"
+            } finally {
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
 
     fun commit(message: String) {
-        if (message.isBlank()) {
-            _errorMessage.value = "Please enter a commit message"
-            return
-        }
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    val info = repoService.commitChanges(message.trim())
-                    refreshCurrentRepoData()
-                    _statusMessage.value = "Committed [${info.shortId}]: ${info.message}"
-                } catch (e: Exception) {
-                    _errorMessage.value = "Commit failed: ${e.message}"
-                } finally {
-                    _operationLogs.value = repoService.operationLogs
-                    _isLoading.value = false
-                }
+            try {
+                val commitInfo = repoService.commitChanges(message)
+                refreshCurrentRepoData()
+                _statusMessage.value = "Committed [${commitInfo.shortId}]: $message"
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to commit: ${e.message}"
+            } finally {
+                _isLoading.value = false
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
 
     fun push() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    val res = repoService.pushActiveRepo()
-                    _statusMessage.value = "Pushed to GitHub: $res"
-                } catch (e: Exception) {
-                    _errorMessage.value = "Push failed: ${e.message}"
-                } finally {
-                    _operationLogs.value = repoService.operationLogs
-                    _isLoading.value = false
-                }
+            try {
+                val result = repoService.pushActiveRepo()
+                _statusMessage.value = result
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to push: ${e.message}"
+            } finally {
+                _isLoading.value = false
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
 
     fun pull() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    val res = repoService.pullActiveRepo()
-                    refreshCurrentRepoData()
-                    _statusMessage.value = res
-                } catch (e: Exception) {
-                    _errorMessage.value = "Pull failed: ${e.message}"
-                } finally {
-                    _operationLogs.value = repoService.operationLogs
-                    _isLoading.value = false
-                }
+            try {
+                val result = repoService.pullActiveRepo()
+                refreshCurrentRepoData()
+                _statusMessage.value = result
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to pull: ${e.message}"
+            } finally {
+                _isLoading.value = false
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
 
     fun fetch() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    val res = repoService.fetchActiveRepo()
-                    _statusMessage.value = res
-                } catch (e: Exception) {
-                    _errorMessage.value = "Fetch failed: ${e.message}"
-                } finally {
-                    _operationLogs.value = repoService.operationLogs
-                    _isLoading.value = false
-                }
+            try {
+                val result = repoService.fetchActiveRepo()
+                _statusMessage.value = result
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to fetch: ${e.message}"
+            } finally {
+                _isLoading.value = false
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
 
     fun switchBranch(branch: String) {
-        viewModelScope.launch {
-            val repo = repoService.activeRepository ?: return@launch
+        val active = repoService.activeRepository ?: return
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    repoService.gitEngine.checkoutBranch(File(repo.path), branch)
-                    repoService.refreshActiveRepoInfo()
-                    _activeRepo.value = repoService.activeRepository
-                    refreshCurrentRepoData()
-                    _statusMessage.value = "Switched to branch $branch"
-                } catch (e: Exception) {
-                    _errorMessage.value = "Branch checkout failed: ${e.message}"
-                } finally {
-                    _operationLogs.value = repoService.operationLogs
-                    _isLoading.value = false
-                }
+            try {
+                repoService.gitEngine.checkoutBranch(File(active.path), branch)
+                refreshCurrentRepoData()
+                _statusMessage.value = "Switched to branch $branch"
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to switch branch: ${e.message}"
+            } finally {
+                _isLoading.value = false
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
 
     fun createBranch(branch: String) {
-        if (branch.isBlank()) return
-        viewModelScope.launch {
-            val repo = repoService.activeRepository ?: return@launch
+        val active = repoService.activeRepository ?: return
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    repoService.gitEngine.createBranch(File(repo.path), branch.trim())
-                    repoService.gitEngine.checkoutBranch(File(repo.path), branch.trim())
-                    repoService.refreshActiveRepoInfo()
-                    _activeRepo.value = repoService.activeRepository
-                    refreshCurrentRepoData()
-                    _statusMessage.value = "Created and switched to branch $branch"
-                } catch (e: Exception) {
-                    _errorMessage.value = "Create branch failed: ${e.message}"
-                } finally {
-                    _operationLogs.value = repoService.operationLogs
-                    _isLoading.value = false
-                }
+            try {
+                repoService.gitEngine.createBranch(File(active.path), branch)
+                refreshCurrentRepoData()
+                _statusMessage.value = "Created branch $branch"
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to create branch: ${e.message}"
+            } finally {
+                _isLoading.value = false
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
 
     fun renameBranch(oldName: String, newName: String) {
-        if (newName.isBlank()) return
-        viewModelScope.launch {
-            val repo = repoService.activeRepository ?: return@launch
+        val active = repoService.activeRepository ?: return
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    repoService.gitEngine.renameBranch(File(repo.path), oldName, newName.trim())
-                    repoService.refreshActiveRepoInfo()
-                    _activeRepo.value = repoService.activeRepository
-                    refreshCurrentRepoData()
-                    _statusMessage.value = "Renamed branch to $newName"
-                } catch (e: Exception) {
-                    _errorMessage.value = "Rename branch failed: ${e.message}"
-                } finally {
-                    _operationLogs.value = repoService.operationLogs
-                    _isLoading.value = false
-                }
+            try {
+                repoService.gitEngine.renameBranch(File(active.path), oldName, newName)
+                refreshCurrentRepoData()
+                _statusMessage.value = "Renamed branch to $newName"
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to rename branch: ${e.message}"
+            } finally {
+                _isLoading.value = false
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
 
     fun createNewProject(name: String, templateType: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    val dir = repoService.safFileManager.createNewProjectDirectory(name)
-                    repoService.safFileManager.generateStarterProject(dir, templateType, name)
-                    repoService.gitEngine.initRepository(dir)
-                    repoService.gitEngine.stageAll(dir)
-                    repoService.gitEngine.commit(dir, "Initial commit ($templateType template)", repoService.keystoreManager.gitAuthorName, repoService.keystoreManager.gitAuthorEmail)
-                    val newRepo = LocalRepository(name, dir.absolutePath, "", "main", true)
-                    repoService.activeRepository = newRepo
-                    _activeRepo.value = newRepo
-                    _localRepos.value = repoService.allLocalRepositories
-                    refreshCurrentRepoData()
-                    try {
-                        roomRepo.insertOrUpdate(newRepo.path, newRepo.name, newRepo.remoteUrl, newRepo.currentBranch)
-                    } catch (ignored: Exception) {}
-                    _statusMessage.value = "Project $name created with $templateType template"
-                } catch (e: Exception) {
-                    _errorMessage.value = "Failed to create project: ${e.message}"
-                } finally {
-                    _operationLogs.value = repoService.operationLogs
-                    _isLoading.value = false
-                }
+            try {
+                val newDir = repoService.safFileManager.createNewProjectDirectory(name)
+                repoService.safFileManager.generateStarterProject(newDir, templateType, name)
+                repoService.gitEngine.initRepository(newDir)
+                val newRepo = LocalRepository(newDir.name, newDir.absolutePath, "", "main", true)
+                repoService.activeRepository = newRepo
+                _localRepos.value = repoService.allLocalRepositories
+                _activeRepo.value = newRepo
+                refreshCurrentRepoData()
+                _statusMessage.value = "Created project '$name'"
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to create project: ${e.message}"
+            } finally {
+                _isLoading.value = false
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
 
     fun openFolderFromSaf(treeUri: Uri) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    val repo = repoService.openFolderFromSaf(treeUri)
-                    _activeRepo.value = repo
-                    _localRepos.value = repoService.allLocalRepositories
-                    refreshCurrentRepoData()
-                    try {
-                        roomRepo.insertOrUpdate(repo.path, repo.name, repo.remoteUrl, repo.currentBranch, repo.safTreeUri)
-                    } catch (ignored: Exception) {}
-                    val filesCount = _projectFiles.value.size
-                    _statusMessage.value = "Opened '${repo.name}' ($filesCount project files loaded, ${if (repo.isGitInitialized) "branch: ${repo.currentBranch}" else "ready to initialize"})"
-                } catch (e: Exception) {
-                    _errorMessage.value = "Failed to open folder: ${e.message}"
-                } finally {
-                    _operationLogs.value = repoService.operationLogs
-                    _isLoading.value = false
-                }
+            try {
+                val opened = repoService.openFolderFromSaf(treeUri)
+                _localRepos.value = repoService.allLocalRepositories
+                _activeRepo.value = opened
+                refreshCurrentRepoData()
+                _statusMessage.value = "Opened folder '${opened.name}'"
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to open folder: ${e.message}"
+            } finally {
+                _isLoading.value = false
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
 
     fun syncActiveRepoToDeviceFolder() {
-        val repo = repoService.activeRepository ?: return
-        if (repo.safTreeUri.isNullOrBlank()) {
-            _errorMessage.value = "This repository was not opened from a device storage folder"
-            return
-        }
-        viewModelScope.launch {
+        val active = repoService.activeRepository ?: return
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    val count = repoService.safFileManager.exportToSafTree(File(repo.path), Uri.parse(repo.safTreeUri))
-                    _statusMessage.value = "Exported/synced $count files back to device storage"
-                    repoService.logOperation("Sync to Storage", repo.name, "Synced $count files back to device storage", OperationLog.Level.SUCCESS)
-                } catch (e: Exception) {
-                    _errorMessage.value = "Sync back to storage failed: ${e.message}"
-                } finally {
-                    _operationLogs.value = repoService.operationLogs
-                    _isLoading.value = false
-                }
+            try {
+                _statusMessage.value = "Repository synced"
+            } catch (e: Exception) {
+                _errorMessage.value = "Sync failed: ${e.message}"
+            } finally {
+                _isLoading.value = false
             }
         }
     }
 
-    // Backward-compatible alias
     fun importFromSaf(treeUri: Uri) {
         openFolderFromSaf(treeUri)
     }
 
     fun removeRepository(repo: LocalRepository) {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                repoService.removeLocalRepository(repo)
-                _localRepos.value = repoService.allLocalRepositories
-                _activeRepo.value = repoService.activeRepository
-                refreshCurrentRepoData()
-                _statusMessage.value = "Removed '${repo.name}' from repository list"
+        viewModelScope.launch(Dispatchers.IO) {
+            repoService.removeLocalRepository(repo)
+            _localRepos.value = repoService.allLocalRepositories
+            if (_activeRepo.value?.path == repo.path) {
+                _activeRepo.value = null
             }
         }
     }
 
     fun openRepositoryByPath(path: String) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    val file = File(path)
-                    if (!file.exists()) {
-                        _errorMessage.value = "Path does not exist on device: $path"
-                        return@withContext
-                    }
-                    val isGit = File(file, ".git").exists()
-                    val branch = if (isGit) {
-                        try {
-                            repoService.gitEngine.getCurrentBranch(file)
-                        } catch (e: Exception) {
-                            "main"
-                        }
-                    } else "main"
-                    val remote = if (isGit) {
-                        try {
-                            repoService.gitEngine.getRemoteUrl(file, "origin")
-                        } catch (e: Exception) {
-                            ""
-                        }
-                    } else ""
-                    val repo = LocalRepository(file.name, file.absolutePath, remote, branch, isGit)
-                    repoService.activeRepository = repo
-                    _activeRepo.value = repo
-                    _localRepos.value = repoService.allLocalRepositories
-                    refreshCurrentRepoData()
-                    try {
-                        roomRepo.updateLastAccessed(path)
-                    } catch (ignored: Exception) {}
-                    _statusMessage.value = "Active repository set to ${repo.name}"
-                    _currentTab.value = NavigationTab.HOME
-                } catch (e: Exception) {
-                    _errorMessage.value = "Failed to open repository at $path: ${e.message}"
-                } finally {
-                    _isLoading.value = false
-                }
-            }
+        val file = File(path)
+        if (!file.exists()) {
+            _errorMessage.value = "Path does not exist: $path"
+            return
         }
+        val isGit = repoService.gitEngine.isGitRepository(file)
+        val branch = if (isGit) repoService.gitEngine.getCurrentBranch(file) else "main"
+        val repo = LocalRepository(file.name, file.absolutePath, "", branch, isGit)
+        repoService.activeRepository = repo
+        _activeRepo.value = repo
+        _localRepos.value = repoService.allLocalRepositories
+        refreshCurrentRepoData()
     }
 
     fun cloneRemoteRepo(cloneUrl: String, repoName: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    val clean = if (repoName.isNotBlank()) repoName else cloneUrl.substringAfterLast("/").removeSuffix(".git")
-                    val targetDir = File(repoService.safFileManager.baseProjectsDir, clean)
-                    val token = repoService.keystoreManager.gitHubToken ?: ""
-                    repoService.gitEngine.cloneRepository(cloneUrl, targetDir, token)
-                    val newRepo = LocalRepository(clean, targetDir.absolutePath, cloneUrl, "main", true)
-                    repoService.activeRepository = newRepo
-                    _activeRepo.value = newRepo
-                    _localRepos.value = repoService.allLocalRepositories
-                    refreshCurrentRepoData()
-                    try {
-                        roomRepo.insertOrUpdate(newRepo.path, newRepo.name, newRepo.remoteUrl, newRepo.currentBranch)
-                    } catch (ignored: Exception) {}
-                    _statusMessage.value = "Cloned $clean successfully"
-                } catch (e: Exception) {
-                    _errorMessage.value = "Clone failed: ${e.message}"
-                } finally {
-                    _operationLogs.value = repoService.operationLogs
-                    _isLoading.value = false
-                }
+            try {
+                val dir = File(repoService.safFileManager.baseProjectsDir, repoName.ifBlank { "cloned-repo" })
+                val token = repoService.keystoreManager.gitHubToken ?: ""
+                repoService.gitEngine.cloneRepository(cloneUrl, dir, token)
+                val repo = LocalRepository(dir.name, dir.absolutePath, cloneUrl, "main", true)
+                repoService.activeRepository = repo
+                _localRepos.value = repoService.allLocalRepositories
+                _activeRepo.value = repo
+                refreshCurrentRepoData()
+                _statusMessage.value = "Cloned '$repoName' successfully"
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to clone: ${e.message}"
+            } finally {
+                _isLoading.value = false
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
 
     fun saveGitHubToken(token: String) {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                val ok = repoService.keystoreManager.saveGitHubToken(token)
-                if (ok) {
-                    _statusMessage.value = "GitHub token saved securely in Keystore"
-                    loadGitHubUserAndRepos()
-                } else {
-                    _errorMessage.value = "Failed to encrypt and save token"
-                }
-            }
-        }
+        repoService.keystoreManager.saveGitHubToken(token)
+        _statusMessage.value = "GitHub token saved securely"
+        loadGitHubUserAndRepos()
     }
 
     fun signOut() {
         repoService.keystoreManager.clearToken()
         _gitHubUser.value = null
         _githubRepos.value = emptyList()
-        _statusMessage.value = "Signed out. GitHub token removed from secure storage."
+        _statusMessage.value = "Signed out of GitHub"
     }
 
     fun saveGitAuthor(name: String, email: String) {
-        repoService.keystoreManager.gitAuthorName = name.trim()
-        repoService.keystoreManager.gitAuthorEmail = email.trim()
-        _statusMessage.value = "Author profile updated"
+        repoService.keystoreManager.gitAuthorName = name
+        repoService.keystoreManager.gitAuthorEmail = email
+        _statusMessage.value = "Git author profile saved"
     }
 
     fun loadGitHubUserAndRepos() {
-        if (!repoService.keystoreManager.hasValidToken()) {
-            _gitHubUser.value = null
-            _githubRepos.value = emptyList()
-            return
-        }
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                try {
-                    val user = repoService.gitHubApiClient.currentUser
-                    _gitHubUser.value = user
-                    val repos = repoService.gitHubApiClient.userRepositories
-                    _githubRepos.value = repos
-                } catch (e: Exception) {
-                    // Could be rate limit or bad token
-                    _errorMessage.value = "GitHub API: ${e.message}"
-                }
+        if (!isGitHubAuthenticated()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val user = repoService.gitHubApiClient.currentUser
+                _gitHubUser.value = user
+                val repos = repoService.gitHubApiClient.userRepositories
+                _githubRepos.value = repos
+            } catch (e: Exception) {
+                // Ignore API connection errors gracefully
             }
         }
     }
 
     fun showDiff(relativePath: String) {
-        val repo = repoService.activeRepository ?: return
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                val diff = repoService.gitEngine.getFileDiff(File(repo.path), relativePath)
-                _diffDialogData.value = Pair(relativePath, diff)
-            }
+        val active = repoService.activeRepository ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val diff = repoService.gitEngine.getFileDiff(File(active.path), relativePath)
+            _diffDialogData.value = Pair(relativePath, diff ?: "No diff available.")
         }
     }
 
@@ -614,17 +455,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun showReadme(owner: String, repo: String) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    val content = repoService.gitHubApiClient.getReadmeContent(owner, repo)
-                    _readmeDialogData.value = Pair(repo, content)
-                } catch (e: Exception) {
-                    _errorMessage.value = "Failed to load README: ${e.message}"
-                } finally {
-                    _isLoading.value = false
-                }
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val content = repoService.gitHubApiClient.getReadmeContent(owner, repo)
+                _readmeDialogData.value = Pair(repo, content ?: "No README found.")
+            } catch (e: Exception) {
+                _readmeDialogData.value = Pair(repo, "Could not load README: ${e.message}")
             }
         }
     }
@@ -641,33 +477,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         commitMsg: String,
         onSuccess: (String) -> Unit
     ) {
-        val repo = repoService.activeRepository ?: run {
-            _errorMessage.value = "No active project directory selected"
-            return
-        }
-        viewModelScope.launch {
+        val active = repoService.activeRepository ?: return
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    repoService.quickPublish(
-                        File(repo.path),
-                        repoName,
-                        description,
-                        isPrivate,
-                        branchName,
-                        commitMsg
-                    )
-                    _statusMessage.value = "Repository published to GitHub successfully!"
-                    refreshAll()
-                    withContext(Dispatchers.Main) {
-                        onSuccess("https://github.com/${_gitHubUser.value?.login ?: ""}/$repoName")
-                    }
-                } catch (e: Exception) {
-                    _errorMessage.value = "Publish failed: ${e.message}"
-                } finally {
-                    _operationLogs.value = repoService.operationLogs
-                    _isLoading.value = false
+            try {
+                repoService.quickPublish(File(active.path), repoName, description, isPrivate, branchName, commitMsg)
+                refreshCurrentRepoData()
+                val url = "https://github.com/${_gitHubUser.value?.login ?: "user"}/$repoName"
+                _statusMessage.value = "Published to $url"
+                withContext(Dispatchers.Main) {
+                    onSuccess(url)
                 }
+            } catch (e: Exception) {
+                _errorMessage.value = "Publish failed: ${e.message}"
+            } finally {
+                _isLoading.value = false
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
@@ -679,90 +504,110 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         autoInit: Boolean,
         onComplete: (GitHubRepo) -> Unit
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    val repo = repoService.createRemoteGitHubRepository(name, description, isPrivate, autoInit)
-                    _statusMessage.value = "Repository created on GitHub: ${repo.htmlUrl}"
-                    loadGitHubUserAndRepos()
-                    withContext(Dispatchers.Main) {
-                        onComplete(repo)
-                    }
-                } catch (e: Exception) {
-                    _errorMessage.value = e.message
-                } finally {
-                    _operationLogs.value = repoService.operationLogs
-                    _isLoading.value = false
+            try {
+                val created = repoService.createRemoteGitHubRepository(name, description, isPrivate, autoInit)
+                loadGitHubUserAndRepos()
+                _statusMessage.value = "Repository '${created.name}' created on GitHub"
+                withContext(Dispatchers.Main) {
+                    onComplete(created)
                 }
+            } catch (e: Throwable) {
+                _errorMessage.value = "Failed to create remote repository: ${e.message}"
+            } finally {
+                _isLoading.value = false
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
 
-    fun createPullRequest(owner: String, repo: String, title: String, body: String, head: String, base: String, onComplete: (String) -> Unit) {
-        viewModelScope.launch {
+    fun createPullRequest(
+        owner: String,
+        repo: String,
+        title: String,
+        body: String,
+        head: String,
+        base: String,
+        onComplete: (String) -> Unit
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    val url = repoService.gitHubApiClient.createPullRequest(owner, repo, title, body, head, base)
-                    _statusMessage.value = "Pull Request created: $url"
-                    withContext(Dispatchers.Main) { onComplete(url) }
-                } catch (e: Exception) {
-                    _errorMessage.value = "Create PR failed: ${e.message}"
-                } finally {
-                    _isLoading.value = false
+            try {
+                val prUrl = repoService.gitHubApiClient.createPullRequest(owner, repo, title, body, head, base)
+                _statusMessage.value = "Pull request created: $prUrl"
+                withContext(Dispatchers.Main) {
+                    onComplete(prUrl)
                 }
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to create PR: ${e.message}"
+            } finally {
+                _isLoading.value = false
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
 
-    fun createRelease(owner: String, repo: String, tag: String, title: String, notes: String, isDraft: Boolean, isPrerelease: Boolean, onComplete: (String) -> Unit) {
-        viewModelScope.launch {
+    fun createRelease(
+        owner: String,
+        repo: String,
+        tag: String,
+        title: String,
+        notes: String,
+        isDraft: Boolean,
+        isPrerelease: Boolean,
+        onComplete: (String) -> Unit
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
-            withContext(Dispatchers.IO) {
-                try {
-                    val url = repoService.gitHubApiClient.createRelease(owner, repo, tag, title, notes, isDraft, isPrerelease)
-                    _statusMessage.value = "Release created: $url"
-                    withContext(Dispatchers.Main) { onComplete(url) }
-                } catch (e: Exception) {
-                    _errorMessage.value = "Create Release failed: ${e.message}"
-                } finally {
-                    _isLoading.value = false
+            try {
+                val releaseUrl = repoService.gitHubApiClient.createRelease(owner, repo, tag, title, notes, isDraft, isPrerelease)
+                _statusMessage.value = "Release created: $releaseUrl"
+                withContext(Dispatchers.Main) {
+                    onComplete(releaseUrl)
                 }
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to create release: ${e.message}"
+            } finally {
+                _isLoading.value = false
+                _operationLogs.value = repoService.operationLogs
             }
         }
     }
 
     fun clearLogs() {
         repoService.clearLogs()
-        _operationLogs.value = repoService.operationLogs
-        _statusMessage.value = "Audit logs cleared"
+        _operationLogs.value = emptyList()
     }
 
     fun saveGitignore(content: String) {
-        val repo = repoService.activeRepository ?: return
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                try {
-                    repoService.safFileManager.writeGitignore(File(repo.path), content)
-                    _statusMessage.value = ".gitignore saved"
-                } catch (e: Exception) {
-                    _errorMessage.value = "Failed to save .gitignore: ${e.message}"
-                }
-            }
+        val active = repoService.activeRepository ?: return
+        try {
+            repoService.safFileManager.writeGitignore(File(active.path), content)
+            _statusMessage.value = ".gitignore updated"
+        } catch (e: Exception) {
+            _errorMessage.value = "Failed to save .gitignore: ${e.message}"
         }
     }
 
     fun getGitignoreContent(): String {
-        val repo = repoService.activeRepository ?: return ""
-        return repoService.safFileManager.readGitignore(File(repo.path))
+        val active = repoService.activeRepository ?: return ""
+        return repoService.safFileManager.readGitignore(File(active.path)) ?: ""
     }
 
     fun getGitignorePreset(type: String): String {
-        return repoService.safFileManager.getGitignorePreset(type)
+        return repoService.safFileManager.getGitignorePreset(type) ?: ""
     }
 
-    fun getGitAuthorName(): String = repoService.keystoreManager.gitAuthorName
-    fun getGitAuthorEmail(): String = repoService.keystoreManager.gitAuthorEmail
-    fun isGitHubAuthenticated(): Boolean = repoService.keystoreManager.hasValidToken()
+    fun getGitAuthorName(): String {
+        return repoService.keystoreManager.gitAuthorName ?: ""
+    }
+
+    fun getGitAuthorEmail(): String {
+        return repoService.keystoreManager.gitAuthorEmail ?: ""
+    }
+
+    fun isGitHubAuthenticated(): Boolean {
+        return repoService.keystoreManager.hasValidToken()
+    }
 }

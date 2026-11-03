@@ -3,7 +3,6 @@ package com.example.ui.screens
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,21 +13,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.core.models.GitHubRepo
 import com.example.core.models.LocalRepository
-import com.example.ui.theme.*
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.ui.theme.GitHubDarkCard
+import com.example.ui.theme.GitHubDarkSurface
+import com.example.ui.theme.GitHubGreen
 import com.example.viewmodel.RepositoryPathsViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RepositoriesScreen(
     activeRepo: LocalRepository?,
@@ -37,484 +35,487 @@ fun RepositoriesScreen(
     isAuthenticated: Boolean,
     onSelectRepo: (LocalRepository) -> Unit,
     onNewProject: () -> Unit,
-    onImportSaf: () -> Unit = {},
-    onOpenFolder: () -> Unit = onImportSaf,
-    onRemoveRepo: ((LocalRepository) -> Unit)? = null,
-    onCloneRepo: (initialUrl: String) -> Unit,
-    onCreateGitHubRepo: () -> Unit = {},
+    onPickFolder: () -> Unit,
+    onRefreshGitHubRepos: () -> Unit,
+    onDeleteRepo: (LocalRepository) -> Unit,
+    onCloneRepo: (String) -> Unit,
+    onCreateGitHubRepo: () -> Unit,
     onViewReadme: (owner: String, repo: String) -> Unit,
     onNavigateSettings: () -> Unit,
-    onOpenRepositoryPath: (String) -> Unit = {},
-    repoPathsViewModel: RepositoryPathsViewModel = viewModel(),
+    onOpenRepoUrl: (String) -> Unit = {},
+    repoPathsViewModel: RepositoryPathsViewModel,
     modifier: Modifier = Modifier
 ) {
-    var selectedTab by remember { mutableStateOf(0) } // 0 = Local, 1 = GitHub, 2 = Saved Paths (Room)
-    var searchQuery by remember { mutableStateOf("") }
     val context = LocalContext.current
-    val roomRepos by repoPathsViewModel.allRepositories.collectAsStateWithLifecycle()
+    var selectedTab by remember { mutableIntStateOf(0) }
+    var searchQuery by remember { mutableStateOf("") }
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(GitHubDarkBackground)
             .testTag("repositories_screen")
     ) {
-        // Tab Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
+        // Tab selector
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = GitHubDarkSurface,
+            contentColor = Color.White
         ) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = GitHubDarkSurfaceVariant,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (selectedTab == 0) GitHubGreen else Color.Transparent)
-                            .clickable { selectedTab = 0 }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Local (${localRepos.size})",
-                            color = if (selectedTab == 0) Color.White else GitHubTextSecondary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (selectedTab == 1) GitHubGreen else Color.Transparent)
-                            .clickable { selectedTab = 1 }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "GitHub (${githubRepos.size})",
-                            color = if (selectedTab == 1) Color.White else GitHubTextSecondary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (selectedTab == 2) GitHubGreen else Color.Transparent)
-                            .clickable { selectedTab = 2 }
-                            .padding(vertical = 8.dp)
-                            .testTag("tab_saved_paths_room"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Saved Paths (${roomRepos.size})",
-                            color = if (selectedTab == 2) Color.White else GitHubTextSecondary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
-                        )
-                    }
-                }
-            }
-        }
-
-        // Action Toolbar
-        if (selectedTab == 0) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = onNewProject,
-                    colors = ButtonDefaults.buttonColors(containerColor = GitHubDarkSurfaceVariant),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("new_project_button")
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = GitHubGreen, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("New Project", fontSize = 12.sp, color = GitHubTextPrimary)
-                }
-
-                Button(
-                    onClick = onOpenFolder,
-                    colors = ButtonDefaults.buttonColors(containerColor = GitHubDarkSurfaceVariant),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("open_folder_button")
-                ) {
-                    Icon(Icons.Default.FolderOpen, contentDescription = null, tint = GitHubBlue, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Open Folder", fontSize = 12.sp, color = GitHubTextPrimary)
-                }
-
-                Button(
-                    onClick = { onCloneRepo("") },
-                    colors = ButtonDefaults.buttonColors(containerColor = GitHubDarkSurfaceVariant),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("clone_repo_button")
-                ) {
-                    Icon(Icons.Default.Download, contentDescription = null, tint = GitHubPurple, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Clone", fontSize = 12.sp, color = GitHubTextPrimary)
-                }
-            }
-        } else {
-            // Action Toolbar for GitHub Tab
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = onCreateGitHubRepo,
-                    colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("new_github_repo_button")
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("New GitHub Repo", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                }
-
-                Button(
-                    onClick = { onCloneRepo("") },
-                    colors = ButtonDefaults.buttonColors(containerColor = GitHubDarkSurfaceVariant),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("clone_github_repo_button")
-                ) {
-                    Icon(Icons.Default.Download, contentDescription = null, tint = GitHubPurple, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Clone URL", fontSize = 12.sp, color = GitHubTextPrimary)
-                }
-            }
-        }
-
-        // Search Bar
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = { Text(if (selectedTab == 0) "Filter local repositories..." else "Search GitHub repositories...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = GitHubTextSecondary) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = GitHubGreen,
-                unfocusedBorderColor = GitHubDarkBorder
+            Tab(
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 },
+                text = { Text("Local (${localRepos.size})") },
+                modifier = Modifier.testTag("tab_local_repos")
             )
-        )
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 },
+                text = { Text("GitHub (${if (isAuthenticated) githubRepos.size else 0})") },
+                modifier = Modifier.testTag("tab_github_repos")
+            )
+            Tab(
+                selected = selectedTab == 2,
+                onClick = { selectedTab = 2 },
+                text = { Text("Saved Paths") },
+                modifier = Modifier.testTag("tab_saved_paths")
+            )
+        }
 
-        // List Content
-        if (selectedTab == 0) {
-            val filteredLocal = localRepos.filter { it.name.contains(searchQuery, ignoreCase = true) }
-            if (filteredLocal.isEmpty()) {
-                Box(
+        when (selectedTab) {
+            0 -> {
+                // Local repositories tab
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(16.dp)
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.FolderOff, contentDescription = null, tint = GitHubTextMuted, modifier = Modifier.size(48.dp))
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text("No local projects match query", color = GitHubTextSecondary, fontSize = 14.sp)
-                    }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(filteredLocal) { repo ->
-                        val isCurrentActive = activeRepo?.path == repo.path
-                        Card(
-                            onClick = { onSelectRepo(repo) },
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = onPickFolder,
+                            colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("repo_card_${repo.name}"),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isCurrentActive) GitHubDarkSurfaceVariant else GitHubDarkSurface
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            border = if (isCurrentActive) CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubGreen))
-                            else CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
+                                .weight(1f)
+                                .height(48.dp)
+                                .testTag("btn_open_folder")
                         ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                            Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Open Folder", maxLines = 1)
+                        }
+
+                        OutlinedButton(
+                            onClick = onNewProject,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .testTag("btn_new_project")
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("New Project", maxLines = 1)
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("search_local_repos"),
+                        placeholder = { Text("Search local repositories...") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        singleLine = true
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+
+                    val filteredRepos = remember(localRepos, searchQuery) {
+                        if (searchQuery.isBlank()) localRepos
+                        else localRepos.filter {
+                            it.name.contains(searchQuery, ignoreCase = true) ||
+                                    it.path.contains(searchQuery, ignoreCase = true)
+                        }
+                    }
+
+                    if (filteredRepos.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    Icons.Default.FolderOff,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(56.dp)
+                                )
+                                Spacer(Modifier.height(12.dp))
+                                Text(
+                                    if (searchQuery.isNotBlank()) "No repositories match your search"
+                                    else "No local repositories opened yet",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "Tap 'Open Folder' to select any project on your device.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(filteredRepos, key = { it.path }) { repo ->
+                                val isActive = activeRepo?.path == repo.path
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("repo_card_${repo.name}"),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isActive) GitHubDarkSurface else GitHubDarkCard
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = if (isActive) ButtonDefaults.outlinedButtonBorder else null
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            Icons.Default.Folder,
-                                            contentDescription = null,
-                                            tint = if (isCurrentActive) GitHubGreen else GitHubBlue,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = repo.name,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 15.sp,
-                                            color = GitHubTextPrimary
-                                        )
-                                    }
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        if (isCurrentActive) {
-                                            Surface(
-                                                shape = RoundedCornerShape(10.dp),
-                                                color = GitHubGreenDark
-                                            ) {
-                                                Text(
-                                                    text = "ACTIVE",
-                                                    color = Color.White,
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                        }
-                                        if (onRemoveRepo != null && (!isCurrentActive || localRepos.size > 1)) {
-                                            IconButton(
-                                                onClick = { onRemoveRepo(repo) },
-                                                modifier = Modifier.size(24.dp)
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.Close,
-                                                    contentDescription = "Remove repository from list",
-                                                    tint = GitHubTextMuted,
-                                                    modifier = Modifier.size(14.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(6.dp))
-
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Surface(
-                                        shape = RoundedCornerShape(4.dp),
-                                        color = GitHubDarkBackground
-                                    ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
                                         Row(
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                            modifier = Modifier.fillMaxWidth(),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Icon(Icons.Default.Share, contentDescription = null, tint = GitHubBlue, modifier = Modifier.size(10.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(repo.currentBranch, fontSize = 11.sp, color = GitHubBlue)
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    if (repo.path.contains("/storage/") || repo.path.contains("/sdcard/") || !repo.path.contains("/files/projects/")) {
-                                        Surface(
-                                            shape = RoundedCornerShape(4.dp),
-                                            color = Color(0x222EA043)
-                                        ) {
-                                            Text(
-                                                text = "In-Place",
-                                                color = GitHubGreen,
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                            Icon(
+                                                Icons.Default.Folder,
+                                                contentDescription = null,
+                                                tint = if (isActive) GitHubGreen else MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(24.dp)
                                             )
+                                            Spacer(Modifier.width(10.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(
+                                                        repo.name,
+                                                        style = MaterialTheme.typography.titleMedium,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    if (isActive) {
+                                                        Spacer(Modifier.width(8.dp))
+                                                        Surface(
+                                                            color = GitHubGreen.copy(alpha = 0.2f),
+                                                            shape = RoundedCornerShape(4.dp)
+                                                        ) {
+                                                            Text(
+                                                                "ACTIVE",
+                                                                style = MaterialTheme.typography.labelSmall,
+                                                                color = GitHubGreen,
+                                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                                Text(
+                                                    repo.path,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
                                         }
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                    }
-                                    Text(
-                                        text = repo.path,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 10.sp,
-                                        color = GitHubTextMuted,
-                                        maxLines = 1,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
 
-                                if (repo.remoteUrl.isNotBlank()) {
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "Remote: " + repo.remoteUrl,
-                                        fontSize = 10.sp,
-                                        color = GitHubTextMuted,
-                                        maxLines = 1
-                                    )
+                                        Spacer(Modifier.height(8.dp))
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    Icons.Default.CallSplit,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(14.dp),
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                Spacer(Modifier.width(4.dp))
+                                                Text(
+                                                    repo.currentBranch ?: "No branch",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+
+                                            Row {
+                                                IconButton(
+                                                    onClick = { onDeleteRepo(repo) },
+                                                    modifier = Modifier.size(36.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.DeleteOutline,
+                                                        contentDescription = "Delete",
+                                                        tint = MaterialTheme.colorScheme.error,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+
+                                                if (!isActive) {
+                                                    Button(
+                                                        onClick = { onSelectRepo(repo) },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
+                                                        modifier = Modifier.height(36.dp)
+                                                    ) {
+                                                        Text("Open", style = MaterialTheme.typography.labelMedium)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-        } else if (selectedTab == 1) {
-            // GitHub Tab
-            if (!isAuthenticated) {
-                Box(
+            1 -> {
+                // GitHub repositories tab
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(16.dp)
                 ) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(20.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                    if (!isAuthenticated) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = GitHubDarkCard),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Default.Lock, contentDescription = null, tint = GitHubGreen, modifier = Modifier.size(44.dp))
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = "GitHub Authentication Required",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                color = GitHubTextPrimary
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "Sign in with GitHub or provide a Personal Access Token in Settings to list and clone your repositories.",
-                                fontSize = 12.sp,
-                                color = GitHubTextSecondary,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Button(
-                                onClick = onNavigateSettings,
-                                colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen)
+                            Column(
+                                modifier = Modifier.padding(20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text("Go to Settings")
+                                Icon(
+                                    Icons.Default.AccountCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(48.dp)
+                                )
+                                Spacer(Modifier.height(12.dp))
+                                Text(
+                                    "Sign in to GitHub",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    "Connect your GitHub account or add a Personal Access Token in Settings to view and clone your repositories.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(Modifier.height(16.dp))
+                                Button(
+                                    onClick = onNavigateSettings,
+                                    colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
+                                    modifier = Modifier.testTag("btn_go_to_settings")
+                                ) {
+                                    Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Open Settings")
+                                }
                             }
                         }
-                    }
-                }
-            } else {
-                val filteredGithub = githubRepos.filter { it.name.contains(searchQuery, ignoreCase = true) || it.fullName.contains(searchQuery, ignoreCase = true) }
-                if (filteredGithub.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No GitHub repositories found.", color = GitHubTextSecondary)
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(filteredGithub) { repo ->
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-                                shape = RoundedCornerShape(12.dp),
-                                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = onCreateGitHubRepo,
+                                colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(48.dp)
+                                    .testTag("btn_create_gh_repo")
                             ) {
-                                Column(modifier = Modifier.padding(14.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("New Remote", maxLines = 1)
+                            }
+
+                            OutlinedButton(
+                                onClick = onRefreshGitHubRepos,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(48.dp)
+                                    .testTag("btn_refresh_gh_repos")
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Refresh", maxLines = 1)
+                            }
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("search_gh_repos"),
+                            placeholder = { Text("Search GitHub repositories...") },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                            singleLine = true
+                        )
+
+                        Spacer(Modifier.height(12.dp))
+
+                        val filteredGhRepos = remember(githubRepos, searchQuery) {
+                            if (searchQuery.isBlank()) githubRepos
+                            else githubRepos.filter {
+                                it.name.contains(searchQuery, ignoreCase = true) ||
+                                        (it.description?.contains(searchQuery, ignoreCase = true) == true)
+                            }
+                        }
+
+                        if (filteredGhRepos.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "No remote repositories found.",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        } else {
+                            LazyColumn(
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                items(filteredGhRepos, key = { it.id }) { repo ->
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("gh_repo_card_${repo.name}"),
+                                        colors = CardDefaults.cardColors(containerColor = GitHubDarkCard),
+                                        shape = RoundedCornerShape(12.dp)
                                     ) {
-                                        Text(
-                                            text = repo.name,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 15.sp,
-                                            color = GitHubBlue
-                                        )
-                                        Surface(
-                                            shape = RoundedCornerShape(10.dp),
-                                            color = if (repo.isPrivate) Color(0x33F85149) else Color(0x332EA043)
-                                        ) {
-                                            Text(
-                                                text = if (repo.isPrivate) "Private" else "Public",
-                                                color = if (repo.isPrivate) GitHubRed else GitHubGreen,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                    }
-
-                                    if (repo.description.isNotBlank()) {
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = repo.description,
-                                            fontSize = 12.sp,
-                                            color = GitHubTextSecondary,
-                                            maxLines = 2
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(8.dp))
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            if (repo.language.isNotBlank()) {
-                                                Text(repo.language, fontSize = 11.sp, color = GitHubOrange, fontWeight = FontWeight.SemiBold)
-                                                Spacer(modifier = Modifier.width(10.dp))
-                                            }
-                                            Icon(Icons.Default.Star, contentDescription = null, tint = GitHubOrange, modifier = Modifier.size(12.dp))
-                                            Spacer(modifier = Modifier.width(2.dp))
-                                            Text("${repo.stargazersCount}", fontSize = 11.sp, color = GitHubTextMuted)
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Icon(Icons.Default.CallSplit, contentDescription = null, tint = GitHubTextSecondary, modifier = Modifier.size(12.dp))
-                                            Spacer(modifier = Modifier.width(2.dp))
-                                            Text("${repo.forksCount}", fontSize = 11.sp, color = GitHubTextMuted)
-                                        }
-
-                                        Row {
-                                            IconButton(
-                                                onClick = {
-                                                    val owner = repo.fullName.substringBefore("/")
-                                                    onViewReadme(owner, repo.name)
-                                                },
-                                                modifier = Modifier.size(32.dp)
+                                        Column(modifier = Modifier.padding(14.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Icon(Icons.Default.Description, contentDescription = "README", tint = GitHubTextSecondary, modifier = Modifier.size(16.dp))
+                                                Icon(
+                                                    if (repo.isPrivate) Icons.Default.Lock else Icons.Default.Folder,
+                                                    contentDescription = null,
+                                                    tint = if (repo.isPrivate) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                                Spacer(Modifier.width(10.dp))
+                                                Text(
+                                                    repo.fullName,
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                Surface(
+                                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                                    shape = RoundedCornerShape(4.dp)
+                                                ) {
+                                                    Text(
+                                                        if (repo.isPrivate) "Private" else "Public",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
                                             }
 
-                                            IconButton(
-                                                onClick = { onCloneRepo(repo.cloneUrl) },
-                                                modifier = Modifier.size(32.dp)
-                                            ) {
-                                                Icon(Icons.Default.Download, contentDescription = "Clone Locally", tint = GitHubGreen, modifier = Modifier.size(16.dp))
+                                            if (!repo.description.isNullOrBlank()) {
+                                                Spacer(Modifier.height(6.dp))
+                                                Text(
+                                                    repo.description,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
                                             }
 
-                                            IconButton(
-                                                onClick = {
-                                                    try {
-                                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(repo.htmlUrl)))
-                                                    } catch (ignored: Exception) {}
-                                                },
-                                                modifier = Modifier.size(32.dp)
+                                            Spacer(Modifier.height(8.dp))
+
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Icon(Icons.Default.OpenInBrowser, contentDescription = "Open Web", tint = GitHubBlue, modifier = Modifier.size(16.dp))
+                                                Row(
+                                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    if (!repo.language.isNullOrBlank()) {
+                                                        Text(
+                                                            repo.language,
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            color = GitHubGreen
+                                                        )
+                                                    }
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFFFFB300))
+                                                        Spacer(Modifier.width(2.dp))
+                                                        Text("${repo.stargazersCount}", style = MaterialTheme.typography.labelSmall)
+                                                    }
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(Icons.Default.CallSplit, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        Spacer(Modifier.width(2.dp))
+                                                        Text("${repo.forksCount}", style = MaterialTheme.typography.labelSmall)
+                                                    }
+                                                }
+
+                                                Row {
+                                                    IconButton(
+                                                        onClick = {
+                                                            val owner = repo.fullName.substringBefore('/')
+                                                            val rName = repo.fullName.substringAfter('/')
+                                                            onViewReadme(owner, rName)
+                                                        },
+                                                        modifier = Modifier.size(36.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.Description, contentDescription = "README", modifier = Modifier.size(18.dp))
+                                                    }
+
+                                                    IconButton(
+                                                        onClick = {
+                                                            val url = repo.htmlUrl ?: "https://github.com/${repo.fullName}"
+                                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                                            context.startActivity(intent)
+                                                        },
+                                                        modifier = Modifier.size(36.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.OpenInBrowser, contentDescription = "Open in browser", modifier = Modifier.size(18.dp))
+                                                    }
+
+                                                    Button(
+                                                        onClick = { onCloneRepo(repo.cloneUrl) },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
+                                                        modifier = Modifier.height(36.dp)
+                                                    ) {
+                                                        Text("Clone", style = MaterialTheme.typography.labelMedium)
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -524,14 +525,13 @@ fun RepositoriesScreen(
                     }
                 }
             }
-        } else {
-            // Saved Paths (Room Database) Tab
-            RepositoryPathsScreen(
-                viewModel = repoPathsViewModel,
-                isEmbedded = true,
-                onOpenRepositoryPath = { entity -> onOpenRepositoryPath(entity.path) },
-                onPickFolderFromSaf = onOpenFolder
-            )
+            2 -> {
+                // Saved Repository Paths tab (Room database)
+                RepositoryPathsScreen(
+                    viewModel = repoPathsViewModel,
+                    onNavigateBack = {}
+                )
+            }
         }
     }
 }

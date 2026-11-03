@@ -2,17 +2,16 @@ package com.example.ui.dialogs
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CallMerge
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.ui.theme.*
+import com.example.ui.theme.GitHubDarkSurface
+import com.example.ui.theme.GitHubGreen
 
 @Composable
 fun CreatePrDialog(
@@ -24,108 +23,118 @@ fun CreatePrDialog(
 ) {
     var title by remember { mutableStateOf("") }
     var body by remember { mutableStateOf("") }
-    var headBranch by remember { mutableStateOf(defaultHeadBranch) }
-    var baseBranch by remember { mutableStateOf("main") }
+    var headBranch by remember(defaultHeadBranch) { mutableStateOf(defaultHeadBranch) }
+    var baseBranch by remember { mutableStateOf(if (branches.contains("main")) "main" else "master") }
 
     Dialog(onDismissRequest = { if (!isLoading) onDismiss() }) {
-        Card(
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = GitHubDarkSurface,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
-                .testTag("create_pr_dialog"),
-            colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-            shape = RoundedCornerShape(16.dp),
-            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
+                .padding(16.dp)
+                .testTag("create_pr_dialog")
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Icon(Icons.Default.CallMerge, contentDescription = null, tint = GitHubGreen)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Create Pull Request",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = GitHubTextPrimary
-                    )
-                }
+                Text(
+                    "Create Pull Request",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(Modifier.height(14.dp))
 
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("PR Title") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GitHubGreen,
-                        unfocusedBorderColor = GitHubDarkBorder
-                    )
+                    label = { Text("PR Title *") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_pr_title"),
+                    singleLine = true,
+                    enabled = !isLoading
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
 
                 OutlinedTextField(
                     value = body,
                     onValueChange = { body = it },
-                    label = { Text("Description") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GitHubGreen,
-                        unfocusedBorderColor = GitHubDarkBorder
-                    )
+                    label = { Text("PR Description") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_pr_body"),
+                    minLines = 2,
+                    maxLines = 4,
+                    enabled = !isLoading
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = headBranch,
-                        onValueChange = { headBranch = it },
-                        label = { Text("Compare (Head)") },
-                        modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GitHubGreen,
-                            unfocusedBorderColor = GitHubDarkBorder
-                        )
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    OutlinedTextField(
-                        value = baseBranch,
-                        onValueChange = { baseBranch = it },
-                        label = { Text("Into (Base)") },
-                        modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GitHubGreen,
-                            unfocusedBorderColor = GitHubDarkBorder
-                        )
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(Modifier.height(10.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = headBranch,
+                        onValueChange = { headBranch = it },
+                        label = { Text("Head (Compare)") },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("input_pr_head"),
+                        singleLine = true,
+                        enabled = !isLoading
+                    )
+
+                    OutlinedTextField(
+                        value = baseBranch,
+                        onValueChange = { baseBranch = it },
+                        label = { Text("Base (Into)") },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("input_pr_base"),
+                        singleLine = true,
+                        enabled = !isLoading
+                    )
+                }
+
+                Spacer(Modifier.height(18.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(
                         onClick = onDismiss,
-                        colors = ButtonDefaults.textButtonColors(contentColor = GitHubTextSecondary)
+                        enabled = !isLoading
                     ) {
                         Text("Cancel")
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Spacer(Modifier.width(8.dp))
+
                     Button(
                         onClick = {
-                            if (title.isNotBlank()) {
+                            if (title.isNotBlank() && headBranch.isNotBlank() && baseBranch.isNotBlank()) {
                                 onCreatePr(title.trim(), body.trim(), headBranch.trim(), baseBranch.trim())
-                                onDismiss()
                             }
                         },
+                        enabled = !isLoading && title.isNotBlank() && headBranch.isNotBlank() && baseBranch.isNotBlank(),
                         colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
-                        enabled = title.isNotBlank() && !isLoading
+                        modifier = Modifier.testTag("btn_confirm_create_pr")
                     ) {
-                        Text("Create PR")
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Creating...")
+                        } else {
+                            Text("Create PR")
+                        }
                     }
                 }
             }

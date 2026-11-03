@@ -5,19 +5,22 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.core.models.ProjectFile
-import com.example.ui.theme.*
+import com.example.ui.theme.GitHubDarkCard
+import com.example.ui.theme.GitHubDarkSurface
+import com.example.ui.theme.GitHubGreen
 
 @Composable
 fun ProjectFilesDialog(
@@ -26,133 +29,128 @@ fun ProjectFilesDialog(
     onDismiss: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
+
     val filteredFiles = remember(files, searchQuery) {
         if (searchQuery.isBlank()) files
-        else files.filter { it.relativePath.contains(searchQuery, ignoreCase = true) }
+        else files.filter {
+            it.name.contains(searchQuery, ignoreCase = true) ||
+                    it.relativePath.contains(searchQuery, ignoreCase = true)
+        }
     }
 
     Dialog(onDismissRequest = onDismiss) {
-        Card(
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = GitHubDarkSurface,
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.85f)
-                .padding(8.dp)
-                .testTag("project_files_dialog"),
-            colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-            shape = RoundedCornerShape(16.dp),
-            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
+                .padding(16.dp)
+                .testTag("project_files_dialog")
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.FolderOpen, contentDescription = null, tint = GitHubGreen)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = "Project Files",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                color = GitHubTextPrimary
-                            )
-                            Text(
-                                text = "$repoName (${files.size} items)",
-                                fontSize = 11.sp,
-                                color = GitHubTextMuted
-                            )
-                        }
-                    }
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = GitHubTextSecondary)
-                    }
-                }
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    "Files in $repoName",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "${files.size} source files scanned",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(Modifier.height(12.dp))
 
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search files...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = GitHubTextSecondary) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GitHubGreen,
-                        unfocusedBorderColor = GitHubDarkBorder
-                    )
+                    placeholder = { Text("Filter files...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_filter_files"),
+                    singleLine = true
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(Modifier.height(12.dp))
 
-                LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(filteredFiles) { file ->
-                        val icon = if (file.isDirectory) Icons.Default.Folder else when (file.extension) {
-                            "java", "kt" -> Icons.Default.Code
-                            "xml", "json" -> Icons.Default.DataObject
-                            "md" -> Icons.Default.Description
-                            "html", "css", "js" -> Icons.Default.Language
-                            else -> Icons.Default.InsertDriveFile
-                        }
-                        val iconTint = if (file.isDirectory) GitHubBlue else when (file.extension) {
-                            "java" -> GitHubOrange
-                            "kt" -> GitHubPurple
-                            "md" -> GitHubGreen
-                            else -> GitHubTextSecondary
-                        }
-
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 2.dp),
-                            colors = CardDefaults.cardColors(containerColor = GitHubDarkBackground)
-                        ) {
-                            Row(
+                if (filteredFiles.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "No files match your search.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 340.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(filteredFiles) { file ->
+                            Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .testTag("file_item_${file.name}"),
+                                colors = CardDefaults.cardColors(containerColor = GitHubDarkCard),
+                                shape = RoundedCornerShape(8.dp)
                             ) {
-                                Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = file.name,
-                                        fontWeight = FontWeight.Medium,
-                                        fontSize = 13.sp,
-                                        color = GitHubTextPrimary
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        if (file.isDirectory) Icons.Default.Folder else Icons.Default.Description,
+                                        contentDescription = null,
+                                        tint = if (file.isDirectory) MaterialTheme.colorScheme.primary else GitHubGreen,
+                                        modifier = Modifier.size(20.dp)
                                     )
+                                    Spacer(Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            file.name,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            file.relativePath,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    Spacer(Modifier.width(8.dp))
                                     Text(
-                                        text = file.relativePath,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 10.sp,
-                                        color = GitHubTextMuted,
-                                        maxLines = 1
+                                        file.formattedSize,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-                                Text(
-                                    text = file.formattedSize,
-                                    fontSize = 11.sp,
-                                    color = GitHubTextSecondary
-                                )
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(Modifier.height(16.dp))
 
-                Button(
-                    onClick = onDismiss,
-                    colors = ButtonDefaults.buttonColors(containerColor = GitHubDarkSurfaceVariant),
-                    modifier = Modifier.fillMaxWidth()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text("Close", color = GitHubTextPrimary)
+                    Button(onClick = onDismiss) {
+                        Text("Close")
+                    }
                 }
             }
         }

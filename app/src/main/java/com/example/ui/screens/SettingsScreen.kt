@@ -3,8 +3,6 @@ package com.example.ui.screens
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -18,18 +16,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.core.models.GitHubUser
 import com.example.core.models.LocalRepository
-import com.example.ui.theme.*
+import com.example.ui.theme.GitHubDarkCard
+import com.example.ui.theme.GitHubDarkSurface
+import com.example.ui.theme.GitHubGreen
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     gitHubUser: GitHubUser?,
@@ -40,428 +41,337 @@ fun SettingsScreen(
     activeRepo: LocalRepository?,
     onSaveToken: (String) -> Unit,
     onSignOut: () -> Unit,
-    onSaveAuthor: (String, String) -> Unit,
-    onSaveGitignore: (String) -> Unit,
-    onGetPresetGitignore: (String) -> String,
+    onSaveAuthor: (name: String, email: String) -> Unit,
+    onSaveGitignore: (String) -> Unit = {},
+    onGetPresetGitignore: (String) -> String = { "" },
     modifier: Modifier = Modifier
 ) {
-    var tokenInput by remember { mutableStateOf("") }
-    var authorName by remember { mutableStateOf(currentAuthorName) }
-    var authorEmail by remember { mutableStateOf(currentAuthorEmail) }
-    var gitignoreText by remember { mutableStateOf(gitignoreContent) }
-    var showTokenHelp by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
-    LaunchedEffect(currentAuthorName, currentAuthorEmail) {
-        authorName = currentAuthorName
-        authorEmail = currentAuthorEmail
-    }
+    var patToken by remember { mutableStateOf("") }
+    var showToken by remember { mutableStateOf(false) }
 
-    LaunchedEffect(gitignoreContent) {
-        gitignoreText = gitignoreContent
-    }
+    var authorName by remember(currentAuthorName) { mutableStateOf(currentAuthorName) }
+    var authorEmail by remember(currentAuthorEmail) { mutableStateOf(currentAuthorEmail) }
+
+    var editGitignore by remember(gitignoreContent) { mutableStateOf(gitignoreContent) }
+    var selectedPreset by remember { mutableStateOf("Android") }
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(GitHubDarkBackground)
             .verticalScroll(scrollState)
             .padding(16.dp)
             .testTag("settings_screen"),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Settings & Identity",
-            fontWeight = FontWeight.Bold,
-            fontSize = 20.sp,
-            color = GitHubTextPrimary
+            "Settings",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
         )
 
-        // GitHub Account Card
+        // 1. GitHub Account Card
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("github_auth_card"),
-            colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-            shape = RoundedCornerShape(16.dp),
-            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = GitHubDarkCard),
+            shape = RoundedCornerShape(12.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "GITHUB AUTHENTICATION",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GitHubGreen
-                    )
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (isAuthenticated) Color(0x332EA043) else Color(0x33F85149)
-                    ) {
-                        Text(
-                            text = if (isAuthenticated) "CONNECTED" else "NOT CONNECTED",
-                            color = if (isAuthenticated) GitHubGreen else GitHubRed,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "GitHub Authentication",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(8.dp))
 
                 if (isAuthenticated && gitHubUser != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (gitHubUser.avatarUrl.isNotBlank()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (!gitHubUser.avatarUrl.isNullOrBlank()) {
                             AsyncImage(
                                 model = gitHubUser.avatarUrl,
                                 contentDescription = "Avatar",
-                                contentScale = ContentScale.Crop,
                                 modifier = Modifier
-                                    .size(52.dp)
+                                    .size(56.dp)
                                     .clip(CircleShape)
-                                    .border(1.dp, GitHubGreen, CircleShape)
                             )
                         } else {
-                            Surface(
-                                shape = CircleShape,
-                                color = GitHubDarkSurfaceVariant,
-                                modifier = Modifier.size(52.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(Icons.Default.Person, contentDescription = null, tint = GitHubGreen)
-                                }
-                            }
+                            Icon(
+                                Icons.Default.AccountCircle,
+                                contentDescription = null,
+                                modifier = Modifier.size(56.dp),
+                                tint = GitHubGreen
+                            )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(Modifier.width(16.dp))
 
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = gitHubUser.name,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = GitHubTextPrimary
+                                gitHubUser.login,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
                             )
-                            Text(
-                                text = "@" + gitHubUser.login,
-                                color = GitHubBlue,
-                                fontSize = 13.sp
-                            )
-                            if (gitHubUser.bio.isNotBlank()) {
+                            if (!gitHubUser.name.isNullOrBlank()) {
                                 Text(
-                                    text = gitHubUser.bio,
-                                    color = GitHubTextSecondary,
-                                    fontSize = 11.sp,
-                                    maxLines = 2
+                                    gitHubUser.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (!gitHubUser.email.isNullOrBlank()) {
+                                Text(
+                                    gitHubUser.email,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(Modifier.height(16.dp))
+
+                    Button(
+                        onClick = onSignOut,
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .testTag("btn_sign_out")
+                    ) {
+                        Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Sign Out")
+                    }
+                } else {
+                    Text(
+                        "Sign in to push, pull, clone private repositories, and create new remotes.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+
+                    // Personal Access Token input
+                    OutlinedTextField(
+                        value = patToken,
+                        onValueChange = { patToken = it },
+                        label = { Text("Personal Access Token (ghp_...)") },
+                        visualTransformation = if (showToken) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { showToken = !showToken }) {
+                                Icon(
+                                    if (showToken) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = "Toggle token visibility"
+                                )
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("input_pat_token"),
+                        singleLine = true
+                    )
+
+                    Spacer(Modifier.height(8.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("${gitHubUser.publicRepos} Repos", fontSize = 12.sp, color = GitHubTextSecondary)
-                        Text("${gitHubUser.followers} Followers", fontSize = 12.sp, color = GitHubTextSecondary)
-                        Text("${gitHubUser.following} Following", fontSize = 12.sp, color = GitHubTextSecondary)
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    OutlinedButton(
-                        onClick = onSignOut,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = GitHubRed),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("sign_out_button")
-                    ) {
-                        Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Sign Out & Remove Stored Token")
-                    }
-                } else {
-                    // Not connected
-                    Text(
-                        text = "Connect with GitHub to publish local projects, clone repos, and manage branches natively.",
-                        fontSize = 12.sp,
-                        color = GitHubTextSecondary
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // OAuth Browser button
-                    Button(
-                        onClick = {
-                            val oauthUrl = "https://github.com/login/oauth/authorize?client_id=Ov23lizr5bVw9V5l9l9l&scope=repo%20user"
-                            try {
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(oauthUrl)))
-                            } catch (ignored: Exception) {}
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("github_oauth_button")
-                    ) {
-                        Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Sign In with GitHub (Browser)")
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Text(
-                        text = "Or enter a Personal Access Token (PAT):",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = GitHubTextPrimary
-                    )
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    OutlinedTextField(
-                        value = tokenInput,
-                        onValueChange = { tokenInput = it },
-                        placeholder = { Text("ghp_... or github_pat_...") },
-                        trailingIcon = {
-                            IconButton(onClick = { showTokenHelp = !showTokenHelp }) {
-                                Icon(Icons.Default.HelpOutline, contentDescription = "Help", tint = GitHubTextSecondary)
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("github_token_input"),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GitHubGreen,
-                            unfocusedBorderColor = GitHubDarkBorder
-                        )
-                    )
-
-                    if (showTokenHelp) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = GitHubDarkBackground,
-                            modifier = Modifier.fillMaxWidth()
+                        Button(
+                            onClick = {
+                                if (patToken.isNotBlank()) {
+                                    onSaveToken(patToken.trim())
+                                    patToken = ""
+                                }
+                            },
+                            enabled = patToken.isNotBlank(),
+                            colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                                .testTag("btn_save_token")
                         ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
-                                Text(
-                                    text = "Required Token Scopes:",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
-                                    color = GitHubGreen
-                                )
-                                Text(
-                                    text = "• repo (Full control of private repositories)\n• user (Read user profile and email)",
-                                    fontSize = 11.sp,
-                                    color = GitHubTextSecondary
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "Create new token on GitHub ↗",
-                                    color = GitHubBlue,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.clickable {
-                                        try {
-                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/settings/tokens/new?scopes=repo,user&description=RepoStudio%20Android")))
-                                        } catch (ignored: Exception) {}
-                                    }
-                                )
-                            }
+                            Text("Save Token")
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Button(
-                        onClick = {
-                            if (tokenInput.isNotBlank()) {
-                                onSaveToken(tokenInput.trim())
-                                tokenInput = ""
-                            }
-                        },
-                        enabled = tokenInput.isNotBlank(),
-                        colors = ButtonDefaults.buttonColors(containerColor = GitHubBlue),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("save_token_button")
-                    ) {
-                        Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Encrypt & Save Token in Keystore")
+                        OutlinedButton(
+                            onClick = {
+                                val intent = Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse("https://github.com/settings/tokens/new?scopes=repo,read:user,user:email&description=RepoStudio%20Android")
+                                )
+                                context.startActivity(intent)
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                        ) {
+                            Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Generate PAT", maxLines = 1)
+                        }
                     }
                 }
             }
         }
 
-        // Git Author Configuration Card
+        // 2. Git Committer Profile Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-            shape = RoundedCornerShape(16.dp),
-            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
+            colors = CardDefaults.cardColors(containerColor = GitHubDarkCard),
+            shape = RoundedCornerShape(12.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "GIT COMMIT IDENTITY",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = GitHubBlue
+                    "Git Author Profile",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    "Name and email attached to your local Git commits.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(Modifier.height(12.dp))
 
                 OutlinedTextField(
                     value = authorName,
                     onValueChange = { authorName = it },
-                    label = { Text("Git Author Name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GitHubGreen,
-                        unfocusedBorderColor = GitHubDarkBorder
-                    )
+                    label = { Text("Author Name") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_author_name"),
+                    singleLine = true
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(Modifier.height(8.dp))
 
                 OutlinedTextField(
                     value = authorEmail,
                     onValueChange = { authorEmail = it },
-                    label = { Text("Git Author Email") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GitHubGreen,
-                        unfocusedBorderColor = GitHubDarkBorder
-                    )
+                    label = { Text("Author Email") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_author_email"),
+                    singleLine = true
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(Modifier.height(12.dp))
 
                 Button(
-                    onClick = { onSaveAuthor(authorName, authorEmail) },
-                    colors = ButtonDefaults.buttonColors(containerColor = GitHubDarkSurfaceVariant),
-                    modifier = Modifier.fillMaxWidth()
+                    onClick = { onSaveAuthor(authorName.trim(), authorEmail.trim()) },
+                    enabled = authorName.isNotBlank() && authorEmail.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .testTag("btn_save_author")
                 ) {
-                    Text("Update Author Identity", color = GitHubTextPrimary)
+                    Text("Save Git Author")
                 }
             }
         }
 
-        // .gitignore Editor Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-            shape = RoundedCornerShape(16.dp),
-            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+        // 3. Gitignore Editor (if active repo selected)
+        if (activeRepo != null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = GitHubDarkCard),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = ".GITIGNORE EDITOR",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GitHubOrange
+                        ".gitignore Editor",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
                     )
-                    if (activeRepo != null) {
-                        Text(
-                            text = activeRepo.name,
-                            fontSize = 11.sp,
-                            color = GitHubTextMuted
-                        )
-                    }
-                }
+                    Text(
+                        "Configure ignored patterns for ${activeRepo.name}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(Modifier.height(12.dp))
 
-                Text("Load Preset Template:", fontSize = 11.sp, color = GitHubTextSecondary)
-                Spacer(modifier = Modifier.height(4.dp))
+                    Text("Load Presets:", style = MaterialTheme.typography.labelMedium)
+                    Spacer(Modifier.height(6.dp))
 
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    listOf("Android", "Java", "Node", "CPP", "General").forEach { preset ->
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = GitHubDarkSurfaceVariant,
-                            modifier = Modifier.clickable {
-                                gitignoreText = onGetPresetGitignore(preset.lowercase())
-                            }
-                        ) {
-                            Text(
-                                text = preset,
-                                fontSize = 10.sp,
-                                color = GitHubTextPrimary,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("Android", "Java", "Node.js", "Python").forEach { preset ->
+                            FilterChip(
+                                selected = selectedPreset == preset,
+                                onClick = {
+                                    selectedPreset = preset
+                                    val presetContent = onGetPresetGitignore(preset)
+                                    if (presetContent.isNotBlank()) {
+                                        editGitignore = presetContent
+                                    }
+                                },
+                                label = { Text(preset) }
                             )
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(Modifier.height(8.dp))
 
-                OutlinedTextField(
-                    value = gitignoreText,
-                    onValueChange = { gitignoreText = it },
-                    label = { Text(".gitignore Content") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(150.dp)
-                        .testTag("gitignore_editor_input"),
-                    textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 11.sp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GitHubGreen,
-                        unfocusedBorderColor = GitHubDarkBorder
+                    OutlinedTextField(
+                        value = editGitignore,
+                        onValueChange = { editGitignore = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                            .testTag("input_gitignore"),
+                        textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
                     )
-                )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(Modifier.height(12.dp))
 
-                Button(
-                    onClick = { onSaveGitignore(gitignoreText) },
-                    colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Save .gitignore")
+                    Button(
+                        onClick = { onSaveGitignore(editGitignore) },
+                        colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .testTag("btn_save_gitignore")
+                    ) {
+                        Text("Save .gitignore")
+                    }
                 }
             }
         }
 
-        // Security & App Info
+        // 4. App Info Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-            shape = RoundedCornerShape(16.dp),
-            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
+            colors = CardDefaults.cardColors(containerColor = GitHubDarkCard),
+            shape = RoundedCornerShape(12.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "SECURITY & ARCHITECTURE",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = GitHubTextMuted
+                    "About RepoStudio",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "• Git Engine: Eclipse JGit 6.8 Native Java Engine\n" +
-                            "• Keystore Encryption: AES/GCM/NoPadding 256-bit Hardware Key\n" +
-                            "• Filesystem: Android Storage Access Framework (SAF)\n" +
-                            "• GitHub API: REST v3 with HTTPS only",
-                    fontSize = 11.sp,
-                    color = GitHubTextSecondary,
-                    lineHeight = 18.sp
+                    "RepoStudio is a lightweight GitHub Desktop client for Android powered by JGit, Room Database, and Android Storage Access Framework (SAF).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Version 1.0 • Keystore AES-256 Encrypted",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = GitHubGreen
                 )
             }
         }

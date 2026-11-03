@@ -1,24 +1,28 @@
 package com.example.ui.dialogs
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CallSplit
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.ui.theme.*
+import com.example.ui.theme.GitHubDarkCard
+import com.example.ui.theme.GitHubDarkSurface
+import com.example.ui.theme.GitHubGreen
 
 @Composable
 fun BranchDialog(
@@ -30,18 +34,17 @@ fun BranchDialog(
     onDismiss: () -> Unit
 ) {
     var newBranchName by remember { mutableStateOf("") }
-    var renameMode by remember { mutableStateOf(false) }
-    var renameBranchName by remember { mutableStateOf(currentBranch) }
+    var renameBranchName by remember { mutableStateOf("") }
+    var showRenameField by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
-        Card(
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = GitHubDarkSurface,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
-                .testTag("branch_manager_dialog"),
-            colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-            shape = RoundedCornerShape(16.dp),
-            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
+                .padding(16.dp)
+                .testTag("branch_dialog")
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Row(
@@ -49,151 +52,153 @@ fun BranchDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Share, contentDescription = null, tint = GitHubBlue)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Branch Manager",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            color = GitHubTextPrimary
-                        )
-                    }
-                    IconButton(onClick = { renameMode = !renameMode }) {
-                        Icon(
-                            Icons.Default.Edit,
-                            contentDescription = "Rename",
-                            tint = if (renameMode) GitHubGreen else GitHubTextSecondary
-                        )
+                    Text(
+                        "Branch Management",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = { showRenameField = !showRenameField }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Rename branch", modifier = Modifier.size(18.dp))
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                if (renameMode) {
-                    Text("Rename Current Branch:", fontSize = 12.sp, color = GitHubTextSecondary)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                if (showRenameField) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         OutlinedTextField(
                             value = renameBranchName,
                             onValueChange = { renameBranchName = it },
-                            modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = GitHubGreen,
-                                unfocusedBorderColor = GitHubDarkBorder
-                            )
+                            placeholder = { Text("Rename $currentBranch to...") },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("input_rename_branch"),
+                            singleLine = true
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(Modifier.width(8.dp))
                         Button(
                             onClick = {
-                                if (renameBranchName.isNotBlank() && renameBranchName != currentBranch) {
+                                if (renameBranchName.isNotBlank()) {
                                     onRenameBranch(currentBranch, renameBranchName.trim())
-                                    renameMode = false
+                                    showRenameField = false
                                 }
                             },
+                            enabled = renameBranchName.isNotBlank(),
                             colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen)
                         ) {
                             Text("Save")
                         }
                     }
-                    Spacer(modifier = Modifier.height(14.dp))
                 }
 
-                Text("Available Branches:", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = GitHubTextSecondary)
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(Modifier.height(12.dp))
 
-                Box(modifier = Modifier.heightIn(max = 180.dp)) {
-                    LazyColumn {
-                        items(branches) { branch ->
-                            val isCurrent = branch == currentBranch
-                            Card(
-                                onClick = {
+                // Create branch input
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = newBranchName,
+                        onValueChange = { newBranchName = it },
+                        placeholder = { Text("New branch name...") },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("input_new_branch"),
+                        singleLine = true
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    IconButton(
+                        onClick = {
+                            if (newBranchName.isNotBlank()) {
+                                onCreateBranch(newBranchName.trim())
+                                newBranchName = ""
+                            }
+                        },
+                        enabled = newBranchName.isNotBlank(),
+                        modifier = Modifier.testTag("btn_create_branch")
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Create", tint = GitHubGreen)
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                Text(
+                    "Branches (${branches.size})",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 240.dp)
+                ) {
+                    items(branches) { branch ->
+                        val isCurrent = branch == currentBranch
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clickable {
                                     if (!isCurrent) {
                                         onSwitchBranch(branch)
                                         onDismiss()
                                     }
-                                },
+                                }
+                                .testTag("branch_item_$branch"),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isCurrent) GitHubDarkCard else Color.Transparent
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 3.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isCurrent) GitHubDarkSurfaceVariant else GitHubDarkBackground
-                                )
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            Icons.Default.Share,
-                                            contentDescription = null,
-                                            tint = if (isCurrent) GitHubGreen else GitHubTextSecondary,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = branch,
-                                            color = if (isCurrent) GitHubGreen else GitHubTextPrimary,
-                                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-                                            fontSize = 14.sp
-                                        )
-                                    }
-                                    if (isCurrent) {
-                                        Icon(Icons.Default.Check, contentDescription = null, tint = GitHubGreen, modifier = Modifier.size(16.dp))
-                                    }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.CallSplit,
+                                        contentDescription = null,
+                                        tint = if (isCurrent) GitHubGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        branch,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isCurrent) GitHubGreen else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                if (isCurrent) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = "Current",
+                                        tint = GitHubGreen,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                 }
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
-                Divider(color = GitHubDarkBorder)
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(Modifier.height(16.dp))
 
-                Text("Create New Branch:", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = GitHubTextSecondary)
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = newBranchName,
-                        onValueChange = { newBranchName = it },
-                        placeholder = { Text("feature/my-branch") },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("new_branch_name_input"),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GitHubGreen,
-                            unfocusedBorderColor = GitHubDarkBorder
-                        )
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            if (newBranchName.isNotBlank()) {
-                                onCreateBranch(newBranchName.trim())
-                                onDismiss()
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
-                        enabled = newBranchName.isNotBlank(),
-                        modifier = Modifier.testTag("create_branch_submit_button")
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(
-                        onClick = onDismiss,
-                        colors = ButtonDefaults.textButtonColors(contentColor = GitHubTextSecondary)
-                    ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
                         Text("Close")
                     }
                 }

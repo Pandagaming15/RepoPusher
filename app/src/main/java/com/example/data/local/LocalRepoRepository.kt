@@ -5,9 +5,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/**
- * Repository pattern implementation abstracting Room database operations for local repository paths.
- */
 class LocalRepoRepository(private val dao: LocalRepoDao) {
 
     val allRepositories: Flow<List<LocalRepoEntity>> = dao.getAllRepositories()

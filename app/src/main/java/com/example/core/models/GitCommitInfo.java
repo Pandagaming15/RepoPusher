@@ -4,17 +4,19 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
+/* JADX INFO: loaded from: classes6.dex */
 public class GitCommitInfo implements Serializable {
-    private String id;
-    private String shortId;
-    private String message;
-    private String authorName;
     private String authorEmail;
-    private long timestamp;
+    private String authorName;
+    private List<String> changedFiles = new ArrayList();
     private String formattedDate;
-    private List<String> changedFiles = new ArrayList<>();
+    private String id;
+    private String message;
+    private String shortId;
+    private long timestamp;
 
-    public GitCommitInfo() {}
+    public GitCommitInfo() {
+    }
 
     public GitCommitInfo(String id, String shortId, String message, String authorName, String authorEmail, long timestamp, String formattedDate) {
         this.id = id;
@@ -26,27 +28,67 @@ public class GitCommitInfo implements Serializable {
         this.formattedDate = formattedDate;
     }
 
-    public String getId() { return id != null ? id : ""; }
-    public void setId(String id) { this.id = id; }
+    public String getId() {
+        return this.id != null ? this.id : "";
+    }
 
-    public String getShortId() { return shortId != null ? shortId : ""; }
-    public void setShortId(String shortId) { this.shortId = shortId; }
+    public void setId(String id) {
+        this.id = id;
+    }
 
-    public String getMessage() { return message != null ? message : ""; }
-    public void setMessage(String message) { this.message = message; }
+    public String getShortId() {
+        return this.shortId != null ? this.shortId : "";
+    }
 
-    public String getAuthorName() { return authorName != null ? authorName : "Unknown"; }
-    public void setAuthorName(String authorName) { this.authorName = authorName; }
+    public void setShortId(String shortId) {
+        this.shortId = shortId;
+    }
 
-    public String getAuthorEmail() { return authorEmail != null ? authorEmail : ""; }
-    public void setAuthorEmail(String authorEmail) { this.authorEmail = authorEmail; }
+    public String getMessage() {
+        return this.message != null ? this.message : "";
+    }
 
-    public long getTimestamp() { return timestamp; }
-    public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+    public void setMessage(String message) {
+        this.message = message;
+    }
 
-    public String getFormattedDate() { return formattedDate != null ? formattedDate : ""; }
-    public void setFormattedDate(String formattedDate) { this.formattedDate = formattedDate; }
+    public String getAuthorName() {
+        return this.authorName != null ? this.authorName : "Unknown";
+    }
 
-    public List<String> getChangedFiles() { return changedFiles; }
-    public void setChangedFiles(List<String> changedFiles) { this.changedFiles = changedFiles != null ? changedFiles : new ArrayList<>(); }
+    public void setAuthorName(String authorName) {
+        this.authorName = authorName;
+    }
+
+    public String getAuthorEmail() {
+        return this.authorEmail != null ? this.authorEmail : "";
+    }
+
+    public void setAuthorEmail(String authorEmail) {
+        this.authorEmail = authorEmail;
+    }
+
+    public long getTimestamp() {
+        return this.timestamp;
+    }
+
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public String getFormattedDate() {
+        return this.formattedDate != null ? this.formattedDate : "";
+    }
+
+    public void setFormattedDate(String formattedDate) {
+        this.formattedDate = formattedDate;
+    }
+
+    public List<String> getChangedFiles() {
+        return this.changedFiles;
+    }
+
+    public void setChangedFiles(List<String> changedFiles) {
+        this.changedFiles = changedFiles != null ? changedFiles : new ArrayList<>();
+    }
 }

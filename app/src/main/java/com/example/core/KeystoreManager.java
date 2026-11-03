@@ -3,34 +3,33 @@ package com.example.core;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.security.keystore.KeyGenParameterSpec;
-import android.security.keystore.KeyProperties;
 import android.util.Base64;
 import android.util.Log;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
+import java.util.HashSet;
+import java.util.Set;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 
+/* JADX INFO: loaded from: classes5.dex */
 public class KeystoreManager {
-    private static final String TAG = "KeystoreManager";
     private static final String ANDROID_KEYSTORE = "AndroidKeyStore";
     private static final String KEY_ALIAS = "RepoStudio_GitHub_Secret_Key";
-    private static final String PREF_NAME = "repostudio_secure_prefs";
-    private static final String PREF_ENCRYPTED_TOKEN = "encrypted_github_token";
-    private static final String PREF_TOKEN_IV = "token_iv";
-    private static final String PREF_GIT_USER_NAME = "git_user_name";
-    private static final String PREF_GIT_USER_EMAIL = "git_user_email";
     private static final String PREF_CLIENT_ID = "github_oauth_client_id";
-
+    private static final String PREF_ENCRYPTED_TOKEN = "encrypted_github_token";
+    private static final String PREF_GIT_USER_EMAIL = "git_user_email";
+    private static final String PREF_GIT_USER_NAME = "git_user_name";
+    private static final String PREF_NAME = "repostudio_secure_prefs";
+    private static final String PREF_SAVED_EXTERNAL_PATHS = "saved_external_repo_paths";
+    private static final String PREF_TOKEN_IV = "token_iv";
+    private static final String TAG = "KeystoreManager";
     private final SharedPreferences preferences;
 
     public KeystoreManager(Context context) {
-        this.preferences = context.getApplicationContext().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        this.preferences = context.getApplicationContext().getSharedPreferences(PREF_NAME, 0);
         initKey();
     }
 
@@ -39,14 +38,8 @@ public class KeystoreManager {
             KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
             keyStore.load(null);
             if (!keyStore.containsAlias(KEY_ALIAS)) {
-                KeyGenerator keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE);
-                KeyGenParameterSpec keyGenParameterSpec = new KeyGenParameterSpec.Builder(
-                        KEY_ALIAS,
-                        KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
-                        .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                        .setKeySize(256)
-                        .build();
+                KeyGenerator keyGenerator = KeyGenerator.getInstance("AES", ANDROID_KEYSTORE);
+                KeyGenParameterSpec keyGenParameterSpec = new KeyGenParameterSpec.Builder(KEY_ALIAS, 3).setBlockModes("GCM").setEncryptionPaddings("NoPadding").setKeySize(256).build();
                 keyGenerator.init(keyGenParameterSpec);
                 keyGenerator.generateKey();
             }
@@ -56,60 +49,52 @@ public class KeystoreManager {
     }
 
     public synchronized boolean saveGitHubToken(String token) {
-        if (token == null || token.trim().isEmpty()) {
-            preferences.edit().remove(PREF_ENCRYPTED_TOKEN).remove(PREF_TOKEN_IV).apply();
-            return true;
+        if (token != null) {
+            if (!token.trim().isEmpty()) {
+                try {
+                    KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
+                    keyStore.load(null);
+                    SecretKey secretKey = (SecretKey) keyStore.getKey(KEY_ALIAS, null);
+                    if (secretKey == null) {
+                        initKey();
+                        secretKey = (SecretKey) keyStore.getKey(KEY_ALIAS, null);
+                    }
+                    Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+                    cipher.init(1, secretKey);
+                    byte[] iv = cipher.getIV();
+                    byte[] encryptedBytes = cipher.doFinal(token.trim().getBytes(StandardCharsets.UTF_8));
+                    String encodedToken = Base64.encodeToString(encryptedBytes, 2);
+                    String encodedIv = Base64.encodeToString(iv, 2);
+                    this.preferences.edit().putString(PREF_ENCRYPTED_TOKEN, encodedToken).putString(PREF_TOKEN_IV, encodedIv).apply();
+                    return true;
+                } catch (Exception e) {
+                    Log.e(TAG, "Error encrypting token: " + e.getMessage());
+                    return false;
+                }
+            }
         }
+        this.preferences.edit().remove(PREF_ENCRYPTED_TOKEN).remove(PREF_TOKEN_IV).apply();
+        return true;
+    }
 
+    public synchronized String getGitHubToken() {
+        String encodedToken = this.preferences.getString(PREF_ENCRYPTED_TOKEN, null);
+        String encodedIv = this.preferences.getString(PREF_TOKEN_IV, null);
+        if (encodedToken == null || encodedIv == null) {
+            return null;
+        }
         try {
             KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
             keyStore.load(null);
             SecretKey secretKey = (SecretKey) keyStore.getKey(KEY_ALIAS, null);
             if (secretKey == null) {
-                initKey();
-                secretKey = (SecretKey) keyStore.getKey(KEY_ALIAS, null);
+                return null;
             }
-
-            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey);
-            byte[] iv = cipher.getIV();
-            byte[] encryptedBytes = cipher.doFinal(token.trim().getBytes(StandardCharsets.UTF_8));
-
-            String encodedToken = Base64.encodeToString(encryptedBytes, Base64.NO_WRAP);
-            String encodedIv = Base64.encodeToString(iv, Base64.NO_WRAP);
-
-            preferences.edit()
-                    .putString(PREF_ENCRYPTED_TOKEN, encodedToken)
-                    .putString(PREF_TOKEN_IV, encodedIv)
-                    .apply();
-            return true;
-        } catch (Exception e) {
-            Log.e(TAG, "Error encrypting token: " + e.getMessage());
-            return false;
-        }
-    }
-
-    public synchronized String getGitHubToken() {
-        String encodedToken = preferences.getString(PREF_ENCRYPTED_TOKEN, null);
-        String encodedIv = preferences.getString(PREF_TOKEN_IV, null);
-
-        if (encodedToken == null || encodedIv == null) {
-            return null;
-        }
-
-        try {
-            KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
-            keyStore.load(null);
-            SecretKey secretKey = (SecretKey) keyStore.getKey(KEY_ALIAS, null);
-            if (secretKey == null) return null;
-
-            byte[] iv = Base64.decode(encodedIv, Base64.NO_WRAP);
-            byte[] encryptedBytes = Base64.decode(encodedToken, Base64.NO_WRAP);
-
+            byte[] iv = Base64.decode(encodedIv, 2);
+            byte[] encryptedBytes = Base64.decode(encodedToken, 2);
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             GCMParameterSpec spec = new GCMParameterSpec(128, iv);
-            cipher.init(Cipher.DECRYPT_MODE, secretKey, spec);
-
+            cipher.init(2, secretKey, spec);
             byte[] decryptedBytes = cipher.doFinal(encryptedBytes);
             return new String(decryptedBytes, StandardCharsets.UTF_8);
         } catch (Exception e) {
@@ -119,59 +104,61 @@ public class KeystoreManager {
     }
 
     public synchronized boolean hasValidToken() {
-        String token = getGitHubToken();
-        return token != null && !token.trim().isEmpty();
+        String token;
+        token = getGitHubToken();
+        return (token == null || token.trim().isEmpty()) ? false : true;
     }
 
     public synchronized void clearToken() {
-        preferences.edit()
-                .remove(PREF_ENCRYPTED_TOKEN)
-                .remove(PREF_TOKEN_IV)
-                .apply();
+        this.preferences.edit().remove(PREF_ENCRYPTED_TOKEN).remove(PREF_TOKEN_IV).apply();
     }
 
     public String getGitAuthorName() {
-        return preferences.getString(PREF_GIT_USER_NAME, "RepoStudio Developer");
+        return this.preferences.getString(PREF_GIT_USER_NAME, "RepoStudio Developer");
     }
 
     public void setGitAuthorName(String name) {
-        preferences.edit().putString(PREF_GIT_USER_NAME, name).apply();
+        this.preferences.edit().putString(PREF_GIT_USER_NAME, name).apply();
     }
 
     public String getGitAuthorEmail() {
-        return preferences.getString(PREF_GIT_USER_EMAIL, "developer@repostudio.local");
+        return this.preferences.getString(PREF_GIT_USER_EMAIL, "developer@repostudio.local");
     }
 
     public void setGitAuthorEmail(String email) {
-        preferences.edit().putString(PREF_GIT_USER_EMAIL, email).apply();
+        this.preferences.edit().putString(PREF_GIT_USER_EMAIL, email).apply();
     }
 
     public String getOAuthClientId() {
-        return preferences.getString(PREF_CLIENT_ID, "");
+        return this.preferences.getString(PREF_CLIENT_ID, "");
     }
 
     public void setOAuthClientId(String clientId) {
-        preferences.edit().putString(PREF_CLIENT_ID, clientId).apply();
+        this.preferences.edit().putString(PREF_CLIENT_ID, clientId).apply();
     }
 
-    private static final String PREF_SAVED_EXTERNAL_PATHS = "saved_external_repo_paths";
-
-    public synchronized java.util.Set<String> getSavedExternalRepoPaths() {
-        java.util.Set<String> set = preferences.getStringSet(PREF_SAVED_EXTERNAL_PATHS, null);
-        return set != null ? new java.util.HashSet<>(set) : new java.util.HashSet<>();
+    public synchronized Set<String> getSavedExternalRepoPaths() {
+        Set<String> set;
+        set = this.preferences.getStringSet(PREF_SAVED_EXTERNAL_PATHS, null);
+        return set != null ? new HashSet(set) : new HashSet();
     }
 
     public synchronized void addSavedExternalRepoPath(String path) {
-        if (path == null || path.trim().isEmpty()) return;
-        java.util.Set<String> set = getSavedExternalRepoPaths();
-        set.add(path.trim());
-        preferences.edit().putStringSet(PREF_SAVED_EXTERNAL_PATHS, set).apply();
+        if (path != null) {
+            if (!path.trim().isEmpty()) {
+                Set<String> set = getSavedExternalRepoPaths();
+                set.add(path.trim());
+                this.preferences.edit().putStringSet(PREF_SAVED_EXTERNAL_PATHS, set).apply();
+            }
+        }
     }
 
     public synchronized void removeSavedExternalRepoPath(String path) {
-        if (path == null) return;
-        java.util.Set<String> set = getSavedExternalRepoPaths();
+        if (path == null) {
+            return;
+        }
+        Set<String> set = getSavedExternalRepoPaths();
         set.remove(path.trim());
-        preferences.edit().putStringSet(PREF_SAVED_EXTERNAL_PATHS, set).apply();
+        this.preferences.edit().putStringSet(PREF_SAVED_EXTERNAL_PATHS, set).apply();
     }
 }

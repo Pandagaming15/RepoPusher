@@ -1,26 +1,24 @@
 package com.example.ui.dialogs
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Difference
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.ui.theme.*
+import com.example.ui.theme.GitHubDarkSurface
+import com.example.ui.theme.GitHubGreen
 
 @Composable
 fun DiffDialog(
@@ -28,105 +26,75 @@ fun DiffDialog(
     diffText: String,
     onDismiss: () -> Unit
 ) {
+    val diffLines = remember(diffText) {
+        if (diffText.isBlank()) listOf("No differences detected.")
+        else diffText.lines()
+    }
+    val hScrollState = rememberScrollState()
+
     Dialog(onDismissRequest = onDismiss) {
-        Card(
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = GitHubDarkSurface,
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.85f)
-                .padding(8.dp)
-                .testTag("diff_viewer_dialog"),
-            colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-            shape = RoundedCornerShape(16.dp),
-            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
+                .padding(16.dp)
+                .testTag("diff_dialog")
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-            ) {
-                // Header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Difference, contentDescription = null, tint = GitHubBlue)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = "Diff Viewer",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                color = GitHubTextPrimary
-                            )
-                            Text(
-                                text = filePath,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                                color = GitHubTextMuted,
-                                maxLines = 1
-                            )
-                        }
-                    }
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = GitHubTextSecondary)
-                    }
-                }
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    "Changes in $filePath",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(Modifier.height(12.dp))
 
-                // Diff Box
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(GitHubDarkBackground)
+                        .heightIn(max = 400.dp)
+                        .background(Color(0xFF0D1117), RoundedCornerShape(8.dp))
                         .padding(8.dp)
+                        .horizontalScroll(hScrollState)
                 ) {
-                    val lines = diffText.lines()
-                    if (lines.isEmpty()) {
-                        Text("No differences found.", color = GitHubTextSecondary, fontSize = 12.sp)
-                    } else {
-                        LazyColumn {
-                            items(lines) { line ->
-                                val (bgColor, textColor) = when {
-                                    line.startsWith("+") && !line.startsWith("+++") -> Pair(Color(0x222EA043), GitHubGreenLight)
-                                    line.startsWith("-") && !line.startsWith("---") -> Pair(Color(0x22F85149), GitHubRed)
-                                    line.startsWith("@@") -> Pair(Color(0x221F6FEB), GitHubBlue)
-                                    else -> Pair(Color.Transparent, GitHubTextPrimary)
-                                }
-
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(bgColor)
-                                        .padding(horizontal = 4.dp, vertical = 1.dp)
-                                ) {
-                                    Text(
-                                        text = line,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 11.sp,
-                                        color = textColor
-                                    )
-                                }
+                    LazyColumn {
+                        items(diffLines) { line ->
+                            val (bgColor, textColor) = when {
+                                line.startsWith("+") && !line.startsWith("+++") ->
+                                    GitHubGreen.copy(alpha = 0.2f) to GitHubGreen
+                                line.startsWith("-") && !line.startsWith("---") ->
+                                    MaterialTheme.colorScheme.error.copy(alpha = 0.2f) to MaterialTheme.colorScheme.error
+                                line.startsWith("@@") ->
+                                    Color(0xFF1E88E5).copy(alpha = 0.2f) to Color(0xFF4FC3F7)
+                                else ->
+                                    Color.Transparent to MaterialTheme.colorScheme.onSurface
                             }
+
+                            Text(
+                                text = line,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = FontFamily.Monospace
+                                ),
+                                color = textColor,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(bgColor)
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(Modifier.height(16.dp))
 
-                Button(
-                    onClick = onDismiss,
-                    colors = ButtonDefaults.buttonColors(containerColor = GitHubDarkSurfaceVariant),
-                    modifier = Modifier.fillMaxWidth()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text("Close Diff", color = GitHubTextPrimary)
+                    Button(onClick = onDismiss) {
+                        Text("Close")
+                    }
                 }
             }
         }

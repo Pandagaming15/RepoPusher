@@ -5,9 +5,6 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-/**
- * Room Entity representing a local GitHub repository stored on device storage.
- */
 @Entity(
     tableName = "local_repository_paths",
     indices = [

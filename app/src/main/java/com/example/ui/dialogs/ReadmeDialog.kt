@@ -5,21 +5,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.ui.theme.*
+import com.example.ui.theme.GitHubDarkSurface
 
 @Composable
 fun ReadmeDialog(
@@ -27,72 +22,52 @@ fun ReadmeDialog(
     content: String,
     onDismiss: () -> Unit
 ) {
+    val scrollState = rememberScrollState()
+
     Dialog(onDismissRequest = onDismiss) {
-        Card(
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = GitHubDarkSurface,
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.85f)
-                .padding(8.dp)
-                .testTag("readme_viewer_dialog"),
-            colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-            shape = RoundedCornerShape(16.dp),
-            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
+                .padding(16.dp)
+                .testTag("readme_dialog")
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Description, contentDescription = null, tint = GitHubGreen)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "$repoName / README.md",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = GitHubTextPrimary
-                        )
-                    }
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = GitHubTextSecondary)
-                    }
-                }
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    "README.md ($repoName)",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(Modifier.height(12.dp))
 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(GitHubDarkBackground)
-                        .padding(14.dp)
+                        .heightIn(max = 380.dp)
+                        .background(Color(0xFF0D1117), RoundedCornerShape(8.dp))
+                        .padding(12.dp)
+                        .verticalScroll(scrollState)
                 ) {
-                    val scrollState = rememberScrollState()
-                    Column(modifier = Modifier.verticalScroll(scrollState)) {
-                        Text(
-                            text = content,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp,
-                            color = GitHubTextPrimary,
-                            lineHeight = 18.sp
-                        )
-                    }
+                    Text(
+                        text = if (content.isBlank()) "No README found for this repository." else content,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(Modifier.height(16.dp))
 
-                Button(
-                    onClick = onDismiss,
-                    colors = ButtonDefaults.buttonColors(containerColor = GitHubDarkSurfaceVariant),
-                    modifier = Modifier.fillMaxWidth()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text("Close", color = GitHubTextPrimary)
+                    Button(onClick = onDismiss) {
+                        Text("Close")
+                    }
                 }
             }
         }

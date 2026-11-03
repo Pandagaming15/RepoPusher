@@ -28,10 +28,13 @@ data class RepositoryPathsUiState(
 
 class RepositoryPathsViewModel(
     application: Application,
-    private val repository: LocalRepoRepository = LocalRepoRepository(
-        AppDatabase.getDatabase(application).localRepoDao()
-    )
+    private val repository: LocalRepoRepository
 ) : AndroidViewModel(application) {
+
+    constructor(application: Application) : this(
+        application,
+        LocalRepoRepository(AppDatabase.getDatabase(application).localRepoDao())
+    )
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -48,7 +51,6 @@ class RepositoryPathsViewModel(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    // Reactive stream of all repositories from Room
     val allRepositories: StateFlow<List<LocalRepoEntity>> = repository.allRepositories
         .stateIn(
             scope = viewModelScope,
@@ -56,7 +58,6 @@ class RepositoryPathsViewModel(
             initialValue = emptyList()
         )
 
-    // Combined UI state with search query filtering
     val uiState: StateFlow<RepositoryPathsUiState> = combine(
         allRepositories,
         _searchQuery,
@@ -101,9 +102,6 @@ class RepositoryPathsViewModel(
         _errorMessage.value = null
     }
 
-    /**
-     * Stores or updates a local GitHub repository path in Room.
-     */
     fun addRepositoryPath(
         path: String,
         name: String = "",
@@ -143,9 +141,6 @@ class RepositoryPathsViewModel(
         }
     }
 
-    /**
-     * Deletes a repository path record from Room.
-     */
     fun deleteRepository(repo: LocalRepoEntity) {
         viewModelScope.launch {
             try {
@@ -160,9 +155,6 @@ class RepositoryPathsViewModel(
         }
     }
 
-    /**
-     * Deletes by ID from Room.
-     */
     fun deleteById(id: Long) {
         viewModelScope.launch {
             try {
@@ -174,9 +166,6 @@ class RepositoryPathsViewModel(
         }
     }
 
-    /**
-     * Updates an existing repository entry in Room.
-     */
     fun updateRepository(repo: LocalRepoEntity) {
         viewModelScope.launch {
             try {
@@ -188,9 +177,6 @@ class RepositoryPathsViewModel(
         }
     }
 
-    /**
-     * Checks if directory still exists on device and refreshes Git status.
-     */
     fun checkAndUpdateStatus(repo: LocalRepoEntity) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {

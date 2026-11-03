@@ -5,9 +5,6 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-/**
- * Main Room Database for RepoStudio storing local repository configurations and paths.
- */
 @Database(
     entities = [LocalRepoEntity::class],
     version = 1,

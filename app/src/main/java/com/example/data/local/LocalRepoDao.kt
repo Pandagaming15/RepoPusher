@@ -8,9 +8,6 @@ import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
-/**
- * Data Access Object for local repository paths in Room.
- */
 @Dao
 interface LocalRepoDao {
 

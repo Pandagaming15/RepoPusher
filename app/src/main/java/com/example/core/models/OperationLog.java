@@ -5,7 +5,16 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
+/* JADX INFO: loaded from: classes6.dex */
 public class OperationLog implements Serializable {
+    private String details;
+    private String formattedTime;
+    private String id;
+    private Level level;
+    private String operation;
+    private String repository;
+    private long timestamp;
+
     public enum Level {
         INFO,
         SUCCESS,
@@ -13,18 +22,11 @@ public class OperationLog implements Serializable {
         ERROR
     }
 
-    private String id;
-    private String operation;
-    private String repository;
-    private String details;
-    private Level level;
-    private long timestamp;
-    private String formattedTime;
-
-    public OperationLog() {}
+    public OperationLog() {
+    }
 
     public OperationLog(String operation, String repository, String details, Level level) {
-        this.id = String.valueOf(System.currentTimeMillis()) + "_" + (int)(Math.random() * 1000);
+        this.id = String.valueOf(System.currentTimeMillis()) + "_" + ((int) (Math.random() * 1000.0d));
         this.operation = operation;
         this.repository = repository;
         this.details = details;
@@ -34,24 +36,59 @@ public class OperationLog implements Serializable {
         this.formattedTime = sdf.format(new Date(this.timestamp));
     }
 
-    public String getId() { return id != null ? id : ""; }
-    public void setId(String id) { this.id = id; }
+    public String getId() {
+        return this.id != null ? this.id : "";
+    }
 
-    public String getOperation() { return operation != null ? operation : "Git Operation"; }
-    public void setOperation(String operation) { this.operation = operation; }
+    public void setId(String id) {
+        this.id = id;
+    }
 
-    public String getRepository() { return repository != null ? repository : ""; }
-    public void setRepository(String repository) { this.repository = repository; }
+    public String getOperation() {
+        return this.operation != null ? this.operation : "Git Operation";
+    }
 
-    public String getDetails() { return details != null ? details : ""; }
-    public void setDetails(String details) { this.details = details; }
+    public void setOperation(String operation) {
+        this.operation = operation;
+    }
 
-    public Level getLevel() { return level != null ? level : Level.INFO; }
-    public void setLevel(Level level) { this.level = level; }
+    public String getRepository() {
+        return this.repository != null ? this.repository : "";
+    }
 
-    public long getTimestamp() { return timestamp; }
-    public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+    public void setRepository(String repository) {
+        this.repository = repository;
+    }
 
-    public String getFormattedTime() { return formattedTime != null ? formattedTime : ""; }
-    public void setFormattedTime(String formattedTime) { this.formattedTime = formattedTime; }
+    public String getDetails() {
+        return this.details != null ? this.details : "";
+    }
+
+    public void setDetails(String details) {
+        this.details = details;
+    }
+
+    public Level getLevel() {
+        return this.level != null ? this.level : Level.INFO;
+    }
+
+    public void setLevel(Level level) {
+        this.level = level;
+    }
+
+    public long getTimestamp() {
+        return this.timestamp;
+    }
+
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public String getFormattedTime() {
+        return this.formattedTime != null ? this.formattedTime : "";
+    }
+
+    public void setFormattedTime(String formattedTime) {
+        this.formattedTime = formattedTime;
+    }
 }

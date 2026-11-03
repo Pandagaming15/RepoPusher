@@ -2,21 +2,23 @@ package com.example.core.models;
 
 import java.io.Serializable;
 
+/* JADX INFO: loaded from: classes6.dex */
 public class GitHubRepo implements Serializable {
-    private long id;
-    private String name;
-    private String fullName;
-    private String description;
-    private boolean isPrivate;
-    private String htmlUrl;
     private String cloneUrl;
     private String defaultBranch;
-    private int stargazersCount;
+    private String description;
     private int forksCount;
+    private String fullName;
+    private String htmlUrl;
+    private long id;
+    private boolean isPrivate;
     private String language;
+    private String name;
+    private int stargazersCount;
     private String updatedAt;
 
-    public GitHubRepo() {}
+    public GitHubRepo() {
+    }
 
     public GitHubRepo(String name, String fullName, String description, boolean isPrivate, String htmlUrl, String cloneUrl, String defaultBranch) {
         this.name = name;
@@ -28,39 +30,99 @@ public class GitHubRepo implements Serializable {
         this.defaultBranch = defaultBranch != null ? defaultBranch : "main";
     }
 
-    public long getId() { return id; }
-    public void setId(long id) { this.id = id; }
+    public long getId() {
+        return this.id;
+    }
 
-    public String getName() { return name != null ? name : ""; }
-    public void setName(String name) { this.name = name; }
+    public void setId(long id) {
+        this.id = id;
+    }
 
-    public String getFullName() { return fullName != null ? fullName : getName(); }
-    public void setFullName(String fullName) { this.fullName = fullName; }
+    public String getName() {
+        return this.name != null ? this.name : "";
+    }
 
-    public String getDescription() { return description != null ? description : ""; }
-    public void setDescription(String description) { this.description = description; }
+    public void setName(String name) {
+        this.name = name;
+    }
 
-    public boolean isPrivate() { return isPrivate; }
-    public void setPrivate(boolean aPrivate) { isPrivate = aPrivate; }
+    public String getFullName() {
+        return this.fullName != null ? this.fullName : getName();
+    }
 
-    public String getHtmlUrl() { return htmlUrl != null ? htmlUrl : ""; }
-    public void setHtmlUrl(String htmlUrl) { this.htmlUrl = htmlUrl; }
+    public void setFullName(String fullName) {
+        this.fullName = fullName;
+    }
 
-    public String getCloneUrl() { return cloneUrl != null ? cloneUrl : getHtmlUrl() + ".git"; }
-    public void setCloneUrl(String cloneUrl) { this.cloneUrl = cloneUrl; }
+    public String getDescription() {
+        return this.description != null ? this.description : "";
+    }
 
-    public String getDefaultBranch() { return defaultBranch != null && !defaultBranch.isEmpty() ? defaultBranch : "main"; }
-    public void setDefaultBranch(String defaultBranch) { this.defaultBranch = defaultBranch; }
+    public void setDescription(String description) {
+        this.description = description;
+    }
 
-    public int getStargazersCount() { return stargazersCount; }
-    public void setStargazersCount(int stargazersCount) { this.stargazersCount = stargazersCount; }
+    public boolean isPrivate() {
+        return this.isPrivate;
+    }
 
-    public int getForksCount() { return forksCount; }
-    public void setForksCount(int forksCount) { this.forksCount = forksCount; }
+    public void setPrivate(boolean aPrivate) {
+        this.isPrivate = aPrivate;
+    }
 
-    public String getLanguage() { return language != null ? language : ""; }
-    public void setLanguage(String language) { this.language = language; }
+    public String getHtmlUrl() {
+        return this.htmlUrl != null ? this.htmlUrl : "";
+    }
 
-    public String getUpdatedAt() { return updatedAt != null ? updatedAt : ""; }
-    public void setUpdatedAt(String updatedAt) { this.updatedAt = updatedAt; }
+    public void setHtmlUrl(String htmlUrl) {
+        this.htmlUrl = htmlUrl;
+    }
+
+    public String getCloneUrl() {
+        return this.cloneUrl != null ? this.cloneUrl : getHtmlUrl() + ".git";
+    }
+
+    public void setCloneUrl(String cloneUrl) {
+        this.cloneUrl = cloneUrl;
+    }
+
+    public String getDefaultBranch() {
+        return (this.defaultBranch == null || this.defaultBranch.isEmpty()) ? "main" : this.defaultBranch;
+    }
+
+    public void setDefaultBranch(String defaultBranch) {
+        this.defaultBranch = defaultBranch;
+    }
+
+    public int getStargazersCount() {
+        return this.stargazersCount;
+    }
+
+    public void setStargazersCount(int stargazersCount) {
+        this.stargazersCount = stargazersCount;
+    }
+
+    public int getForksCount() {
+        return this.forksCount;
+    }
+
+    public void setForksCount(int forksCount) {
+        this.forksCount = forksCount;
+    }
+
+    public String getLanguage() {
+        return this.language != null ? this.language : "";
+    }
+
+    public void setLanguage(String language) {
+        this.language = language;
+    }
+
+    public String getUpdatedAt() {
+        return this.updatedAt != null ? this.updatedAt : "";
+    }
+
+    public void setUpdatedAt(String updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 }

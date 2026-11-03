@@ -2,117 +2,120 @@ package com.example.ui.dialogs
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.ui.theme.*
+import com.example.ui.theme.GitHubDarkSurface
+import com.example.ui.theme.GitHubGreen
 
 @Composable
 fun CloneRepoDialog(
     initialUrl: String = "",
     isLoading: Boolean,
     onDismiss: () -> Unit,
-    onClone: (url: String, name: String) -> Unit
+    onClone: (url: String, dirName: String) -> Unit
 ) {
-    var cloneUrl by remember { mutableStateOf(initialUrl) }
-    var localName by remember {
-        mutableStateOf(
-            if (initialUrl.isNotBlank()) initialUrl.substringAfterLast("/").removeSuffix(".git") else ""
-        )
+    var repoUrl by remember(initialUrl) { mutableStateOf(initialUrl) }
+    var dirName by remember(initialUrl) {
+        val suggested = if (initialUrl.isNotBlank()) {
+            initialUrl.trimEnd('/').substringAfterLast('/').removeSuffix(".git")
+        } else ""
+        mutableStateOf(suggested)
     }
 
     Dialog(onDismissRequest = { if (!isLoading) onDismiss() }) {
-        Card(
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = GitHubDarkSurface,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
-                .testTag("clone_repo_dialog"),
-            colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-            shape = RoundedCornerShape(16.dp),
-            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
+                .padding(16.dp)
+                .testTag("clone_repo_dialog")
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Icon(Icons.Default.Download, contentDescription = null, tint = GitHubGreen)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Clone Repository",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = GitHubTextPrimary
-                    )
-                }
+                Text(
+                    "Clone Repository",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Clone a remote GitHub or Git repository into local storage.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(Modifier.height(16.dp))
 
                 OutlinedTextField(
-                    value = cloneUrl,
+                    value = repoUrl,
                     onValueChange = {
-                        cloneUrl = it
-                        if (localName.isBlank() && it.contains("/")) {
-                            localName = it.substringAfterLast("/").removeSuffix(".git")
+                        repoUrl = it
+                        if (dirName.isBlank()) {
+                            dirName = it.trimEnd('/').substringAfterLast('/').removeSuffix(".git")
                         }
                     },
-                    label = { Text("Git Repository URL (HTTPS)") },
-                    placeholder = { Text("https://github.com/user/repo.git") },
+                    label = { Text("Repository Clone URL") },
+                    placeholder = { Text("https://github.com/owner/repo.git") },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("clone_url_input"),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GitHubGreen,
-                        unfocusedBorderColor = GitHubDarkBorder
-                    )
+                        .testTag("input_clone_url"),
+                    singleLine = true,
+                    enabled = !isLoading
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(Modifier.height(12.dp))
 
                 OutlinedTextField(
-                    value = localName,
-                    onValueChange = { localName = it },
+                    value = dirName,
+                    onValueChange = { dirName = it },
                     label = { Text("Local Folder Name") },
+                    placeholder = { Text("my-repository") },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("clone_name_input"),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GitHubGreen,
-                        unfocusedBorderColor = GitHubDarkBorder
-                    )
+                        .testTag("input_clone_dir"),
+                    singleLine = true,
+                    enabled = !isLoading
                 )
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(Modifier.height(20.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(
                         onClick = onDismiss,
-                        colors = ButtonDefaults.textButtonColors(contentColor = GitHubTextSecondary)
+                        enabled = !isLoading
                     ) {
                         Text("Cancel")
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Spacer(Modifier.width(8.dp))
+
                     Button(
                         onClick = {
-                            if (cloneUrl.isNotBlank()) {
-                                onClone(cloneUrl.trim(), localName.trim())
-                                onDismiss()
+                            if (repoUrl.isNotBlank()) {
+                                onClone(repoUrl.trim(), dirName.trim())
                             }
                         },
+                        enabled = !isLoading && repoUrl.isNotBlank(),
                         colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
-                        enabled = cloneUrl.isNotBlank() && !isLoading,
-                        modifier = Modifier.testTag("clone_submit_button")
+                        modifier = Modifier.testTag("btn_confirm_clone")
                     ) {
                         if (isLoading) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp))
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Cloning...")
                         } else {
                             Text("Clone")
                         }

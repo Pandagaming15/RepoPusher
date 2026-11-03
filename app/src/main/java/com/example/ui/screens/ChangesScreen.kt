@@ -1,7 +1,6 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,16 +11,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.core.models.GitFileStatus
 import com.example.core.models.LocalRepository
-import com.example.ui.theme.*
+import com.example.ui.theme.GitHubDarkCard
+import com.example.ui.theme.GitHubDarkSurface
+import com.example.ui.theme.GitHubGreen
 
 @Composable
 fun ChangesScreen(
@@ -43,103 +42,121 @@ fun ChangesScreen(
     modifier: Modifier = Modifier
 ) {
     var commitMessage by remember { mutableStateOf("") }
-    val staged = changes.filter { it.isStaged }
-    val unstaged = changes.filter { !it.isStaged }
+
+    val stagedChanges = remember(changes) { changes.filter { it.isStaged } }
+    val unstagedChanges = remember(changes) { changes.filter { !it.isStaged } }
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(GitHubDarkBackground)
             .testTag("changes_screen")
     ) {
-        // Top Toolbar: Branch & Remote Actions
-        Surface(
-            color = GitHubDarkSurface,
-            tonalElevation = 2.dp,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Branch Selector chip
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(GitHubDarkSurfaceVariant)
-                            .clickable { onOpenBranchManager() }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = null, tint = GitHubBlue, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = activeRepo?.currentBranch ?: "main",
-                            color = GitHubBlue,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = GitHubTextSecondary, modifier = Modifier.size(16.dp))
-                    }
-
-                    // Push & Pull
-                    Row {
-                        OutlinedButton(
-                            onClick = onPull,
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = GitHubTextPrimary),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier.testTag("pull_button")
-                        ) {
-                            Icon(Icons.Default.Download, contentDescription = null, tint = GitHubPurple, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Pull", fontSize = 11.sp)
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Button(
-                            onClick = onPush,
-                            colors = ButtonDefaults.buttonColors(containerColor = GitHubBlue),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier.testTag("push_button")
-                        ) {
-                            Icon(Icons.Default.Upload, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Push", fontSize = 11.sp)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Stage toolbar
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Staged: ${staged.size} | Unstaged: ${unstaged.size}",
-                        fontSize = 12.sp,
-                        color = GitHubTextSecondary,
-                        fontWeight = FontWeight.SemiBold
+        if (activeRepo == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Default.FolderOff,
+                        contentDescription = null,
+                        modifier = Modifier.size(56.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Row {
-                        TextButton(
-                            onClick = onStageAll,
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "No repository selected",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Please open a repository from the Repositories tab to view and commit changes.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            return
+        }
+
+        // Active Repository Control Header
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            colors = CardDefaults.cardColors(containerColor = GitHubDarkCard),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            activeRepo.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 2.dp)
                         ) {
-                            Text("Stage All", color = GitHubGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                        if (staged.isNotEmpty()) {
-                            Spacer(modifier = Modifier.width(4.dp))
-                            TextButton(
-                                onClick = onUnstageAll,
-                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                            OutlinedButton(
+                                onClick = onOpenBranchManager,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier
+                                    .height(30.dp)
+                                    .testTag("btn_branch_manager")
                             ) {
-                                Text("Unstage All", color = GitHubRed, fontSize = 12.sp)
+                                Icon(Icons.Default.CallSplit, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    activeRepo.currentBranch ?: "master",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
                             }
+                        }
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        IconButton(
+                            onClick = onPull,
+                            enabled = !isLoading,
+                            modifier = Modifier.testTag("btn_pull")
+                        ) {
+                            Icon(Icons.Default.ArrowDownward, contentDescription = "Pull")
+                        }
+                        IconButton(
+                            onClick = onPush,
+                            enabled = !isLoading,
+                            modifier = Modifier.testTag("btn_push")
+                        ) {
+                            Icon(Icons.Default.ArrowUpward, contentDescription = "Push", tint = GitHubGreen)
+                        }
+                        IconButton(
+                            onClick = onOpenCommitHistory,
+                            modifier = Modifier.testTag("btn_history")
+                        ) {
+                            Icon(Icons.Default.History, contentDescription = "History")
+                        }
+                        IconButton(
+                            onClick = onOpenCreatePr,
+                            modifier = Modifier.testTag("btn_create_pr")
+                        ) {
+                            Icon(Icons.Default.MergeType, contentDescription = "Create PR")
+                        }
+                        IconButton(
+                            onClick = onOpenCreateRelease,
+                            modifier = Modifier.testTag("btn_create_release")
+                        ) {
+                            Icon(Icons.Default.Label, contentDescription = "Release")
                         }
                     }
                 }
@@ -147,154 +164,145 @@ fun ChangesScreen(
         }
 
         // List of Changes
-        if (changes.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = GitHubGreen, modifier = Modifier.size(48.dp))
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "Working Tree Clean",
-                        fontWeight = FontWeight.Bold,
-                        color = GitHubTextPrimary,
-                        fontSize = 16.sp
-                    )
-                    Text(
-                        text = "No uncommitted changes in current repository.",
-                        fontSize = 12.sp,
-                        color = GitHubTextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row {
-                        OutlinedButton(onClick = onOpenCommitHistory) {
-                            Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Commit History")
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        OutlinedButton(onClick = onOpenCreatePr) {
-                            Icon(Icons.Default.CallMerge, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("New PR")
-                        }
-                    }
-                }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Staged Section
-                if (staged.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = "STAGED CHANGES (${staged.size})",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = GitHubGreen
-                        )
-                    }
-                    items(staged) { item ->
-                        ChangeItemCard(
-                            item = item,
-                            isStaged = true,
-                            onToggleStage = { onUnstageFile(item.relativePath) },
-                            onShowDiff = { onShowDiff(item.relativePath) }
-                        )
-                    }
-                }
-
-                // Unstaged Section
-                if (unstaged.isNotEmpty()) {
-                    item {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "CHANGES (${unstaged.size})",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = GitHubOrange
-                        )
-                    }
-                    items(unstaged) { item ->
-                        ChangeItemCard(
-                            item = item,
-                            isStaged = false,
-                            onToggleStage = { onStageFile(item.relativePath) },
-                            onShowDiff = { onShowDiff(item.relativePath) }
-                        )
-                    }
-                }
-            }
-        }
-
-        // Commit Box at bottom
-        Surface(
-            color = GitHubDarkSurface,
-            tonalElevation = 6.dp,
-            modifier = Modifier.fillMaxWidth()
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp)
-            ) {
-                OutlinedTextField(
-                    value = commitMessage,
-                    onValueChange = { commitMessage = it },
-                    placeholder = { Text("Commit summary (e.g. Update user model and API calls)") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("commit_message_input"),
-                    minLines = 2,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GitHubGreen,
-                        unfocusedBorderColor = GitHubDarkBorder
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
+            // Staged Changes Header
+            item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row {
-                        IconButton(onClick = onOpenCreatePr, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Default.CallMerge, contentDescription = "Create PR", tint = GitHubBlue)
-                        }
-                        IconButton(onClick = onOpenCreateRelease, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Default.Label, contentDescription = "Create Release", tint = GitHubPurple)
+                    Text(
+                        "Staged Changes (${stagedChanges.size})",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = GitHubGreen
+                    )
+                    if (stagedChanges.isNotEmpty()) {
+                        TextButton(
+                            onClick = onUnstageAll,
+                            modifier = Modifier.testTag("btn_unstage_all")
+                        ) {
+                            Text("Unstage All", style = MaterialTheme.typography.labelSmall)
                         }
                     }
+                }
+            }
 
-                    Button(
-                        onClick = {
-                            if (commitMessage.isNotBlank()) {
-                                onCommit(commitMessage)
-                                commitMessage = ""
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
-                        enabled = commitMessage.isNotBlank() && !isLoading,
-                        modifier = Modifier.testTag("commit_button")
-                    ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp))
-                        } else {
-                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Commit to ${activeRepo?.currentBranch ?: "main"}")
+            if (stagedChanges.isEmpty()) {
+                item {
+                    Text(
+                        "No staged changes",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
+            } else {
+                items(stagedChanges, key = { "staged_${it.relativePath}" }) { change ->
+                    ChangeItemCard(
+                        item = change,
+                        isStaged = true,
+                        onToggleStage = { onUnstageFile(change.relativePath) },
+                        onShowDiff = { onShowDiff(change.relativePath) }
+                    )
+                }
+            }
+
+            // Unstaged Changes Header
+            item {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Changes (${unstagedChanges.size})",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (unstagedChanges.isNotEmpty()) {
+                        TextButton(
+                            onClick = onStageAll,
+                            modifier = Modifier.testTag("btn_stage_all")
+                        ) {
+                            Text("Stage All", style = MaterialTheme.typography.labelSmall)
                         }
                     }
+                }
+            }
+
+            if (unstagedChanges.isEmpty()) {
+                item {
+                    Text(
+                        if (stagedChanges.isEmpty()) "Working tree clean. No modified files."
+                        else "No unstaged changes",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
+            } else {
+                items(unstagedChanges, key = { "unstaged_${it.relativePath}" }) { change ->
+                    ChangeItemCard(
+                        item = change,
+                        isStaged = false,
+                        onToggleStage = { onStageFile(change.relativePath) },
+                        onShowDiff = { onShowDiff(change.relativePath) }
+                    )
+                }
+            }
+        }
+
+        // Commit Box at Bottom
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                OutlinedTextField(
+                    value = commitMessage,
+                    onValueChange = { commitMessage = it },
+                    placeholder = { Text("Commit message...") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_commit_message"),
+                    minLines = 2,
+                    maxLines = 4
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                Button(
+                    onClick = {
+                        if (commitMessage.isNotBlank()) {
+                            onCommit(commitMessage.trim())
+                            commitMessage = ""
+                        }
+                    },
+                    enabled = !isLoading && commitMessage.isNotBlank() && stagedChanges.isNotEmpty(),
+                    colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("btn_commit")
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (stagedChanges.isNotEmpty()) "Commit (${stagedChanges.size} staged)"
+                        else "Stage files to commit"
+                    )
                 }
             }
         }
@@ -308,79 +316,81 @@ fun ChangeItemCard(
     onToggleStage: () -> Unit,
     onShowDiff: () -> Unit
 ) {
-    val (badgeText, badgeColor) = when (item.changeType) {
-        GitFileStatus.ChangeType.MODIFIED -> Pair("M", GitHubOrange)
-        GitFileStatus.ChangeType.ADDED -> Pair("A", GitHubGreen)
-        GitFileStatus.ChangeType.UNTRACKED -> Pair("U", GitHubBlue)
-        GitFileStatus.ChangeType.DELETED -> Pair("D", GitHubRed)
-        GitFileStatus.ChangeType.CONFLICT -> Pair("!", GitHubRed)
-        else -> Pair("?", GitHubTextSecondary)
-    }
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("change_item_${item.fileName}"),
-        colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-        shape = RoundedCornerShape(10.dp),
-        border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
+            .testTag("change_item_${item.relativePath}"),
+        colors = CardDefaults.cardColors(containerColor = GitHubDarkCard),
+        shape = RoundedCornerShape(8.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { onShowDiff() }
+            val (statusLetter, statusColor) = when (item.changeType) {
+                GitFileStatus.ChangeType.MODIFIED -> "M" to Color(0xFFFFB300)
+                GitFileStatus.ChangeType.UNTRACKED -> "?" to GitHubGreen
+                GitFileStatus.ChangeType.ADDED -> "A" to GitHubGreen
+                GitFileStatus.ChangeType.DELETED -> "D" to MaterialTheme.colorScheme.error
+                GitFileStatus.ChangeType.MISSING -> "!" to MaterialTheme.colorScheme.error
+                GitFileStatus.ChangeType.CONFLICT -> "C" to MaterialTheme.colorScheme.error
+                else -> "U" to MaterialTheme.colorScheme.onSurfaceVariant
+            }
+
+            Surface(
+                color = statusColor.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(4.dp),
+                modifier = Modifier.size(24.dp)
             ) {
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = badgeColor.copy(alpha = 0.2f)
-                ) {
+                Box(contentAlignment = Alignment.Center) {
                     Text(
-                        text = badgeText,
-                        color = badgeColor,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Text(
-                        text = item.fileName,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp,
-                        color = GitHubTextPrimary
-                    )
-                    Text(
-                        text = item.relativePath,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp,
-                        color = GitHubTextMuted,
-                        maxLines = 1
+                        statusLetter,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = statusColor,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onShowDiff, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Difference, contentDescription = "Diff", tint = GitHubTextSecondary, modifier = Modifier.size(16.dp))
-                }
-                IconButton(onClick = onToggleStage, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        imageVector = if (isStaged) Icons.Default.RemoveCircleOutline else Icons.Default.AddCircleOutline,
-                        contentDescription = if (isStaged) "Unstage" else "Stage",
-                        tint = if (isStaged) GitHubRed else GitHubGreen,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+            Spacer(Modifier.width(10.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    item.relativePath,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    item.changeType?.name?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Unknown",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            IconButton(
+                onClick = onShowDiff,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    Icons.Default.Difference,
+                    contentDescription = "Show Diff",
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            IconButton(
+                onClick = onToggleStage,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    if (isStaged) Icons.Default.RemoveCircleOutline else Icons.Default.AddCircleOutline,
+                    contentDescription = if (isStaged) "Unstage" else "Stage",
+                    tint = if (isStaged) MaterialTheme.colorScheme.error else GitHubGreen,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }

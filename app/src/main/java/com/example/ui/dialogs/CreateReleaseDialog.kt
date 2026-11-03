@@ -2,8 +2,6 @@ package com.example.ui.dialogs
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Label
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -11,123 +9,144 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.ui.theme.*
+import com.example.ui.theme.GitHubDarkSurface
+import com.example.ui.theme.GitHubGreen
 
 @Composable
 fun CreateReleaseDialog(
     isLoading: Boolean,
     onDismiss: () -> Unit,
-    onCreateRelease: (tag: String, title: String, notes: String, isDraft: Boolean, isPrerelease: Boolean) -> Unit
+    onCreateRelease: (tagName: String, name: String, body: String, isDraft: Boolean, isPrerelease: Boolean) -> Unit
 ) {
-    var tagName by remember { mutableStateOf("v1.0.0") }
-    var title by remember { mutableStateOf("Release v1.0.0") }
-    var notes by remember { mutableStateOf("Initial release built and published with RepoStudio for Android.") }
+    var tagName by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+    var body by remember { mutableStateOf("") }
     var isDraft by remember { mutableStateOf(false) }
     var isPrerelease by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = { if (!isLoading) onDismiss() }) {
-        Card(
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = GitHubDarkSurface,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
-                .testTag("create_release_dialog"),
-            colors = CardDefaults.cardColors(containerColor = GitHubDarkSurface),
-            shape = RoundedCornerShape(16.dp),
-            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(GitHubDarkBorder))
+                .padding(16.dp)
+                .testTag("create_release_dialog")
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Label, contentDescription = null, tint = GitHubBlue)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Create GitHub Release",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = GitHubTextPrimary
-                    )
-                }
+                Text(
+                    "Create GitHub Release",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(Modifier.height(14.dp))
 
                 OutlinedTextField(
                     value = tagName,
                     onValueChange = { tagName = it },
-                    label = { Text("Tag Version (e.g. v1.0.0)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GitHubGreen,
-                        unfocusedBorderColor = GitHubDarkBorder
-                    )
+                    label = { Text("Tag Name * (e.g. v1.0.0)") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_release_tag"),
+                    singleLine = true,
+                    enabled = !isLoading
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
 
                 OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
+                    value = name,
+                    onValueChange = { name = it },
                     label = { Text("Release Title") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GitHubGreen,
-                        unfocusedBorderColor = GitHubDarkBorder
-                    )
+                    placeholder = { Text("Initial Production Release") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_release_title"),
+                    singleLine = true,
+                    enabled = !isLoading
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
 
                 OutlinedTextField(
-                    value = notes,
-                    onValueChange = { notes = it },
-                    label = { Text("Release Notes (Markdown)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GitHubGreen,
-                        unfocusedBorderColor = GitHubDarkBorder
-                    )
+                    value = body,
+                    onValueChange = { body = it },
+                    label = { Text("Release Notes") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_release_notes"),
+                    minLines = 2,
+                    maxLines = 4,
+                    enabled = !isLoading
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(Modifier.height(10.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Pre-release", color = GitHubTextPrimary, fontSize = 13.sp)
-                    Switch(
-                        checked = isPrerelease,
-                        onCheckedChange = { isPrerelease = it },
-                        colors = SwitchDefaults.colors(checkedTrackColor = GitHubBlue)
+                    Text("Draft Release", style = MaterialTheme.typography.bodyMedium)
+                    Checkbox(
+                        checked = isDraft,
+                        onCheckedChange = { isDraft = it },
+                        enabled = !isLoading
                     )
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Pre-release", style = MaterialTheme.typography.bodyMedium)
+                    Checkbox(
+                        checked = isPrerelease,
+                        onCheckedChange = { isPrerelease = it },
+                        enabled = !isLoading
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(
                         onClick = onDismiss,
-                        colors = ButtonDefaults.textButtonColors(contentColor = GitHubTextSecondary)
+                        enabled = !isLoading
                     ) {
                         Text("Cancel")
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Spacer(Modifier.width(8.dp))
+
                     Button(
                         onClick = {
-                            if (tagName.isNotBlank() && title.isNotBlank()) {
-                                onCreateRelease(tagName.trim(), title.trim(), notes.trim(), isDraft, isPrerelease)
-                                onDismiss()
+                            if (tagName.isNotBlank()) {
+                                onCreateRelease(tagName.trim(), name.trim(), body.trim(), isDraft, isPrerelease)
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = GitHubBlue),
-                        enabled = tagName.isNotBlank() && !isLoading
+                        enabled = !isLoading && tagName.isNotBlank(),
+                        colors = ButtonDefaults.buttonColors(containerColor = GitHubGreen),
+                        modifier = Modifier.testTag("btn_confirm_create_release")
                     ) {
-                        Text("Publish Release")
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Publishing...")
+                        } else {
+                            Text("Publish Release")
+                        }
                     }
                 }
             }

@@ -317,7 +317,6 @@ fun RepositoryPathsScreen(
         }
     }
 
-    // Add Repository Dialog
     if (showAddDialog) {
         AddRepositoryPathDialog(
             onDismiss = { showAddDialog = false },
@@ -334,7 +333,6 @@ fun RepositoryPathsScreen(
         )
     }
 
-    // Edit Repository Dialog
     repoToEdit?.let { repo ->
         EditRepositoryPathDialog(
             repo = repo,
@@ -346,7 +344,6 @@ fun RepositoryPathsScreen(
         )
     }
 
-    // Delete Confirmation Dialog
     repoToDelete?.let { repo ->
         AlertDialog(
             onDismissRequest = { repoToDelete = null },
@@ -412,7 +409,6 @@ fun RepositoryPathCard(
                 .fillMaxWidth()
                 .padding(14.dp)
         ) {
-            // Header: Name + Badges
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -438,7 +434,6 @@ fun RepositoryPathCard(
                     )
                 }
 
-                // Branch Badge
                 Surface(
                     shape = RoundedCornerShape(6.dp),
                     color = GitHubDarkSurfaceVariant
@@ -466,7 +461,6 @@ fun RepositoryPathCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // File Path Row with Copy button
             Surface(
                 shape = RoundedCornerShape(6.dp),
                 color = GitHubDarkBackground,
@@ -497,7 +491,6 @@ fun RepositoryPathCard(
                 }
             }
 
-            // Remote URL if configured
             if (repo.remoteUrl.isNotBlank()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -517,7 +510,6 @@ fun RepositoryPathCard(
                 }
             }
 
-            // Notes if configured
             if (repo.notes.isNotBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
@@ -530,7 +522,6 @@ fun RepositoryPathCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Timestamp and actions
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

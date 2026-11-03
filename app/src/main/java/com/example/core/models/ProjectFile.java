@@ -4,18 +4,22 @@ import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import okhttp3.internal.ws.RealWebSocket;
+import org.eclipse.jgit.lib.BranchConfig;
 
+/* JADX INFO: loaded from: classes6.dex */
 public class ProjectFile implements Serializable {
+    private String extension;
+    private boolean isDirectory;
+    private boolean isIgnored;
+    private long lastModified;
     private String name;
     private String path;
     private String relativePath;
-    private boolean isDirectory;
     private long sizeBytes;
-    private long lastModified;
-    private String extension;
-    private boolean isIgnored;
 
-    public ProjectFile() {}
+    public ProjectFile() {
+    }
 
     public ProjectFile(String name, String path, String relativePath, boolean isDirectory, long sizeBytes, long lastModified) {
         this.name = name;
@@ -24,46 +28,89 @@ public class ProjectFile implements Serializable {
         this.isDirectory = isDirectory;
         this.sizeBytes = sizeBytes;
         this.lastModified = lastModified;
-        if (!isDirectory && name.contains(".")) {
-            this.extension = name.substring(name.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+        if (!isDirectory && name.contains(BranchConfig.LOCAL_REPOSITORY)) {
+            this.extension = name.substring(name.lastIndexOf(46) + 1).toLowerCase(Locale.ROOT);
         } else {
             this.extension = isDirectory ? "folder" : "";
         }
     }
 
-    public String getName() { return name != null ? name : ""; }
-    public void setName(String name) { this.name = name; }
+    public String getName() {
+        return this.name != null ? this.name : "";
+    }
 
-    public String getPath() { return path != null ? path : ""; }
-    public void setPath(String path) { this.path = path; }
+    public void setName(String name) {
+        this.name = name;
+    }
 
-    public String getRelativePath() { return relativePath != null ? relativePath : ""; }
-    public void setRelativePath(String relativePath) { this.relativePath = relativePath; }
+    public String getPath() {
+        return this.path != null ? this.path : "";
+    }
 
-    public boolean isDirectory() { return isDirectory; }
-    public void setDirectory(boolean directory) { isDirectory = directory; }
+    public void setPath(String path) {
+        this.path = path;
+    }
 
-    public long getSizeBytes() { return sizeBytes; }
-    public void setSizeBytes(long sizeBytes) { this.sizeBytes = sizeBytes; }
+    public String getRelativePath() {
+        return this.relativePath != null ? this.relativePath : "";
+    }
 
-    public long getLastModified() { return lastModified; }
-    public void setLastModified(long lastModified) { this.lastModified = lastModified; }
+    public void setRelativePath(String relativePath) {
+        this.relativePath = relativePath;
+    }
 
-    public String getExtension() { return extension != null ? extension : ""; }
-    public void setExtension(String extension) { this.extension = extension; }
+    public boolean isDirectory() {
+        return this.isDirectory;
+    }
 
-    public boolean isIgnored() { return isIgnored; }
-    public void setIgnored(boolean ignored) { isIgnored = ignored; }
+    public void setDirectory(boolean directory) {
+        this.isDirectory = directory;
+    }
+
+    public long getSizeBytes() {
+        return this.sizeBytes;
+    }
+
+    public void setSizeBytes(long sizeBytes) {
+        this.sizeBytes = sizeBytes;
+    }
+
+    public long getLastModified() {
+        return this.lastModified;
+    }
+
+    public void setLastModified(long lastModified) {
+        this.lastModified = lastModified;
+    }
+
+    public String getExtension() {
+        return this.extension != null ? this.extension : "";
+    }
+
+    public void setExtension(String extension) {
+        this.extension = extension;
+    }
+
+    public boolean isIgnored() {
+        return this.isIgnored;
+    }
+
+    public void setIgnored(boolean ignored) {
+        this.isIgnored = ignored;
+    }
 
     public String getFormattedSize() {
-        if (isDirectory) return "--";
-        if (sizeBytes < 1024) return sizeBytes + " B";
-        if (sizeBytes < 1024 * 1024) return String.format(Locale.US, "%.1f KB", sizeBytes / 1024.0);
-        return String.format(Locale.US, "%.2f MB", sizeBytes / (1024.0 * 1024.0));
+        if (this.isDirectory) {
+            return "--";
+        }
+        if (this.sizeBytes < RealWebSocket.DEFAULT_MINIMUM_DEFLATE_SIZE) {
+            return this.sizeBytes + " B";
+        }
+        return this.sizeBytes < 1048576 ? String.format(Locale.US, "%.1f KB", Double.valueOf(this.sizeBytes / 1024.0d)) : String.format(Locale.US, "%.2f MB", Double.valueOf(this.sizeBytes / 1048576.0d));
     }
 
     public String getFormattedDate() {
         SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
-        return sdf.format(new Date(lastModified));
+        return sdf.format(new Date(this.lastModified));
     }
 }

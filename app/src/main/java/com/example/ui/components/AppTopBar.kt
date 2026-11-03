@@ -1,20 +1,18 @@
 package com.example.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.models.LocalRepository
@@ -28,171 +26,133 @@ fun AppTopBar(
     onSelectRepo: (LocalRepository) -> Unit,
     onRefresh: () -> Unit,
     onNewProject: () -> Unit,
-    onOpenFolder: () -> Unit = {},
+    onOpenFolder: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    var expandedMenu by remember { mutableStateOf(false) }
+    var expandedRepoSelector by remember { mutableStateOf(false) }
 
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag("app_top_bar"),
-        color = GitHubDarkSurface,
-        tonalElevation = 2.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Repo Selector / Title
-            Box {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(GitHubDarkSurfaceVariant)
-                        .clickable { expanded = true }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                        .testTag("repo_selector_dropdown"),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Folder,
-                        contentDescription = "Repository",
-                        tint = GitHubGreen,
-                        modifier = Modifier.size(18.dp)
+    TopAppBar(
+        modifier = modifier.testTag("app_top_bar"),
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { expandedRepoSelector = true }
+                    .padding(horizontal = 6.dp, vertical = 4.dp)
+                    .testTag("top_bar_repo_selector")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Source,
+                    contentDescription = null,
+                    tint = GitHubGreen,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(
+                        text = "RepoStudio",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = GitHubTextPrimary
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = activeRepo?.name ?: "No Repo Selected",
-                            color = GitHubTextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (activeRepo != null) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Share,
-                                    contentDescription = "Branch",
-                                    tint = GitHubBlue,
-                                    modifier = Modifier.size(10.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = activeRepo.currentBranch,
-                                    color = GitHubTextSecondary,
-                                    fontSize = 11.sp
-                                )
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Icon(
-                        imageVector = Icons.Default.ArrowDropDown,
-                        contentDescription = "Select Repository",
-                        tint = GitHubTextSecondary
+                    Text(
+                        text = activeRepo?.name ?: "No repo selected",
+                        fontSize = 11.sp,
+                        color = GitHubTextSecondary,
+                        maxLines = 1
                     )
                 }
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = "Switch Repository",
+                    tint = GitHubTextSecondary,
+                    modifier = Modifier.size(18.dp)
+                )
 
                 DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false },
-                    modifier = Modifier
-                        .background(GitHubDarkSurface)
-                        .widthIn(min = 220.dp)
+                    expanded = expandedRepoSelector,
+                    onDismissRequest = { expandedRepoSelector = false },
+                    modifier = Modifier.testTag("top_bar_repo_dropdown")
                 ) {
-                    Text(
-                        text = "SWITCH REPOSITORY",
-                        color = GitHubTextMuted,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                    )
-                    Divider(color = GitHubDarkBorder)
-
                     if (localRepos.isEmpty()) {
                         DropdownMenuItem(
-                            text = { Text("No local repositories yet", color = GitHubTextSecondary, fontSize = 13.sp) },
-                            onClick = { }
+                            text = { Text("No repositories found", color = GitHubTextMuted) },
+                            onClick = { expandedRepoSelector = false }
                         )
                     } else {
                         localRepos.forEach { repo ->
-                            val isSelected = activeRepo?.path == repo.path
                             DropdownMenuItem(
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = if (repo.isGitInitialized) Icons.Default.CheckCircle else Icons.Default.Folder,
-                                        contentDescription = null,
-                                        tint = if (isSelected) GitHubGreen else GitHubTextSecondary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                },
                                 text = {
-                                    Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            Icons.Default.Folder,
+                                            contentDescription = null,
+                                            tint = if (repo.id == activeRepo?.id) GitHubGreen else GitHubTextSecondary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
                                         Text(
                                             text = repo.name,
-                                            color = if (isSelected) GitHubGreen else GitHubTextPrimary,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            fontSize = 13.sp
-                                        )
-                                        Text(
-                                            text = repo.currentBranch,
-                                            color = GitHubTextMuted,
-                                            fontSize = 11.sp
+                                            color = if (repo.id == activeRepo?.id) GitHubGreen else GitHubTextPrimary,
+                                            fontWeight = if (repo.id == activeRepo?.id) FontWeight.Bold else FontWeight.Normal
                                         )
                                     }
                                 },
                                 onClick = {
-                                    expanded = false
                                     onSelectRepo(repo)
+                                    expandedRepoSelector = false
                                 }
                             )
                         }
                     }
+                }
+            }
+        },
+        actions = {
+            IconButton(
+                onClick = onRefresh,
+                modifier = Modifier.testTag("top_bar_refresh_button")
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = GitHubTextPrimary)
+            }
 
-                    Divider(color = GitHubDarkBorder)
+            Box {
+                IconButton(
+                    onClick = { expandedMenu = true },
+                    modifier = Modifier.testTag("top_bar_more_button")
+                ) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "More actions", tint = GitHubTextPrimary)
+                }
+
+                DropdownMenu(
+                    expanded = expandedMenu,
+                    onDismissRequest = { expandedMenu = false },
+                    modifier = Modifier.testTag("top_bar_more_dropdown")
+                ) {
                     DropdownMenuItem(
-                        leadingIcon = {
-                            Icon(Icons.Default.FolderOpen, contentDescription = null, tint = GitHubGreen, modifier = Modifier.size(16.dp))
-                        },
-                        text = { Text("Open Folder (In-Place)...", color = GitHubGreen, fontSize = 13.sp) },
+                        text = { Text("Open Device Folder") },
+                        leadingIcon = { Icon(Icons.Default.FolderOpen, contentDescription = null, tint = GitHubBlue) },
                         onClick = {
-                            expanded = false
+                            expandedMenu = false
                             onOpenFolder()
                         }
                     )
                     DropdownMenuItem(
-                        leadingIcon = {
-                            Icon(Icons.Default.Add, contentDescription = null, tint = GitHubBlue, modifier = Modifier.size(16.dp))
-                        },
-                        text = { Text("New Local Project...", color = GitHubBlue, fontSize = 13.sp) },
+                        text = { Text("New Starter Project") },
+                        leadingIcon = { Icon(Icons.Default.Add, contentDescription = null, tint = GitHubGreen) },
                         onClick = {
-                            expanded = false
+                            expandedMenu = false
                             onNewProject()
                         }
                     )
                 }
             }
-
-            // Right Action: Refresh
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = onRefresh,
-                    modifier = Modifier.testTag("refresh_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Refresh",
-                        tint = GitHubTextPrimary
-                    )
-                }
-            }
-        }
-    }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = GitHubDarkSurface
+        )
+    )
 }
