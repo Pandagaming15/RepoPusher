@@ -30,12 +30,16 @@ fun ProjectFilesDialog(
 ) {
     var searchQuery by remember { mutableStateOf("") }
 
+    val fileCount = remember(files) { files.count { !it.isDirectory } }
+    val dirCount = remember(files) { files.count { it.isDirectory } }
+
     val filteredFiles = remember(files, searchQuery) {
-        if (searchQuery.isBlank()) files
+        val list = if (searchQuery.isBlank()) files
         else files.filter {
             it.name.contains(searchQuery, ignoreCase = true) ||
                     it.relativePath.contains(searchQuery, ignoreCase = true)
         }
+        list.sortedWith(compareBy({ !it.isDirectory }, { it.relativePath.lowercase() }))
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -54,7 +58,7 @@ fun ProjectFilesDialog(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "${files.size} source files scanned",
+                    "$fileCount files, $dirCount folders scanned",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

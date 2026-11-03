@@ -163,7 +163,7 @@ class MainActivity : ComponentActivity() {
                                     activeRepo = activeRepo,
                                     localRepos = localRepos,
                                     githubRepos = githubRepos,
-                                    isAuthenticated = gitHubUser != null,
+                                    isAuthenticated = gitHubUser != null || mainViewModel.isGitHubAuthenticated(),
                                     onSelectRepo = { mainViewModel.selectRepository(it) },
                                     onNewProject = { showNewProjectDialog = true },
                                     onPickFolder = { openDocumentTreeLauncher.launch(null) },
@@ -252,8 +252,8 @@ class MainActivity : ComponentActivity() {
                             NewProjectDialog(
                                 isLoading = isLoading,
                                 onDismiss = { showNewProjectDialog = false },
-                                onCreate = { name, path ->
-                                    mainViewModel.createNewProject(name, "android")
+                                onCreate = { name, path, template ->
+                                    mainViewModel.createNewProject(name, template, path)
                                     showNewProjectDialog = false
                                 }
                             )
@@ -261,7 +261,7 @@ class MainActivity : ComponentActivity() {
 
                         if (showCreateGitHubRepoDialog) {
                             CreateGitHubRepoDialog(
-                                isAuthenticated = gitHubUser != null,
+                                isAuthenticated = gitHubUser != null || mainViewModel.isGitHubAuthenticated(),
                                 currentUsername = gitHubUser?.login ?: "",
                                 isLoading = isLoading,
                                 onDismiss = { showCreateGitHubRepoDialog = false },

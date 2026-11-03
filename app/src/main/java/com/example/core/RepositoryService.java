@@ -201,8 +201,16 @@ public class RepositoryService {
         }
         File dir = new File(this.activeRepository.getPath());
         this.gitEngine.initRepository(dir);
+        try {
+            this.gitEngine.stageAll(dir);
+            String authorName = this.keystoreManager.getGitAuthorName();
+            String authorEmail = this.keystoreManager.getGitAuthorEmail();
+            this.gitEngine.commit(dir, "Initial commit: " + this.activeRepository.getName(), authorName, authorEmail);
+        } catch (Exception e) {
+            Log.w(TAG, "Initial commit on git init: " + e.getMessage());
+        }
         refreshActiveRepoInfo();
-        logOperation("Git Init", this.activeRepository.getName(), "Initialized Git repository", OperationLog.Level.SUCCESS);
+        logOperation("Git Init", this.activeRepository.getName(), "Initialized Git repository and committed files", OperationLog.Level.SUCCESS);
     }
 
     public List<GitFileStatus> getActiveRepoStatus() throws Exception {

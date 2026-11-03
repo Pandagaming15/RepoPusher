@@ -304,19 +304,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun createNewProject(name: String, templateType: String) {
+    fun createNewProject(name: String, templateType: String = "general", folderName: String = "") {
         viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
             try {
-                val newDir = repoService.safFileManager.createNewProjectDirectory(name)
+                val dirName = folderName.ifBlank { name }
+                val newDir = repoService.safFileManager.createNewProjectDirectory(dirName)
                 repoService.safFileManager.generateStarterProject(newDir, templateType, name)
                 repoService.gitEngine.initRepository(newDir)
-                val newRepo = LocalRepository(newDir.name, newDir.absolutePath, "", "main", true)
+                try {
+                    repoService.gitEngine.stageAll(newDir)
+                    val authorName = repoService.keystoreManager.gitAuthorName
+                    val authorEmail = repoService.keystoreManager.gitAuthorEmail
+                    repoService.gitEngine.commit(newDir, "Initial commit: $name", authorName, authorEmail)
+                } catch (ignored: Exception) {
+                }
+                val newRepo = LocalRepository(name, newDir.absolutePath, "", "main", true)
+                repoService.keystoreManager.addSavedExternalRepoPath(newDir.absolutePath)
                 repoService.activeRepository = newRepo
+                try {
+                    roomRepo.insertOrUpdate(
+                        path = newDir.absolutePath,
+                        name = name,
+                        branch = "main",
+                        notes = "Created locally with $templateType template"
+                    )
+                } catch (ignored: Exception) {
+                }
                 _localRepos.value = repoService.allLocalRepositories
                 _activeRepo.value = newRepo
                 refreshCurrentRepoData()
-                _statusMessage.value = "Created project '$name'"
+                _statusMessage.value = "Created project '$name' with Git repository"
             } catch (e: Exception) {
                 _errorMessage.value = "Failed to create project: ${e.message}"
             } finally {
@@ -331,6 +349,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _isLoading.value = true
             try {
                 val opened = repoService.openFolderFromSaf(treeUri)
+                try {
+                    roomRepo.insertOrUpdate(
+                        path = opened.path,
+                        name = opened.name,
+                        remoteUrl = opened.remoteUrl,
+                        branch = opened.currentBranch,
+                        safTreeUri = opened.safTreeUri
+                    )
+                } catch (ignored: Exception) {
+                }
                 _localRepos.value = repoService.allLocalRepositories
                 _activeRepo.value = opened
                 refreshCurrentRepoData()

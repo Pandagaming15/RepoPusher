@@ -67,11 +67,18 @@ public class SafFileManager {
 
     public File createNewProjectDirectory(String projectName) throws IOException {
         String cleanName = projectName.replaceAll("[^a-zA-Z0-9_.-]", "_");
+        if (cleanName.trim().isEmpty()) {
+            cleanName = "Project";
+        }
         File dir = new File(this.baseProjectsDir, cleanName);
         if (dir.exists()) {
-            throw new IOException("A project directory with this name already exists: " + cleanName);
+            File[] children = dir.listFiles();
+            if (children != null && children.length > 0) {
+                cleanName = cleanName + "_" + (System.currentTimeMillis() % 10000);
+                dir = new File(this.baseProjectsDir, cleanName);
+            }
         }
-        if (!dir.mkdirs()) {
+        if (!dir.exists() && !dir.mkdirs()) {
             throw new IOException("Failed to create project directory: " + cleanName);
         }
         return dir;
@@ -267,23 +274,61 @@ public class SafFileManager {
         if (directFile == null || !directFile.exists() || !directFile.isDirectory() || !directFile.canRead() || !directFile.canWrite()) {
             return false;
         }
-        DocumentFile[] safChildren = null;
+
+        // If inside app-specific storage (internal or external files dir), full POSIX File access is guaranteed
+        File appExternal = this.context.getExternalFilesDir(null);
+        File appInternal = this.context.getFilesDir();
+        boolean isInsideAppStorage = (appExternal != null && directFile.getAbsolutePath().startsWith(appExternal.getAbsolutePath()))
+                || (appInternal != null && directFile.getAbsolutePath().startsWith(appInternal.getAbsolutePath()));
+        if (isInsideAppStorage) {
+            return true;
+        }
+
+        // For any external location outside app-specific storage on Android 10+ (Scoped Storage):
+        // File.listFiles() returns directories but HIDES regular source code and non-media files!
         if (rootDoc != null) {
             try {
-                safChildren = rootDoc.listFiles();
+                DocumentFile[] safChildren = rootDoc.listFiles();
+                if (safChildren != null && safChildren.length > 0) {
+                    File[] localChildren = directFile.listFiles();
+                    if (localChildren == null) {
+                        return false;
+                    }
+                    int safRegularFiles = 0;
+                    for (DocumentFile doc : safChildren) {
+                        if (!doc.isDirectory()) {
+                            safRegularFiles++;
+                        }
+                    }
+                    int localRegularFiles = 0;
+                    for (File f : localChildren) {
+                        if (!f.isDirectory()) {
+                            localRegularFiles++;
+                        }
+                    }
+                    // If SAF sees regular files but POSIX File cannot see all of them,
+                    // Android Scoped Storage is blocking File.listFiles() -> must import into app storage!
+                    if (safRegularFiles > 0 && localRegularFiles < safRegularFiles) {
+                        Log.w(TAG, "Scoped storage restriction: SAF sees " + safRegularFiles + " files, but POSIX File only sees " + localRegularFiles + ". Importing to app workspace.");
+                        return false;
+                    }
+                }
             } catch (Exception e) {
-                Log.w(TAG, "Direct write probe failed for " + directFile.getAbsolutePath() + ": " + e.getMessage());
+                Log.w(TAG, "Error checking SAF children: " + e.getMessage());
+                return false;
             }
         }
-        File[] localChildren = directFile.listFiles();
-        if (safChildren != null && safChildren.length > 0 && (localChildren == null || localChildren.length == 0)) {
-            Log.w(TAG, "POSIX File sees 0 files while SAF has " + safChildren.length + " items. Bypassing in-place direct access.");
-            return false;
-        }
+
+        // JGit requires creating .git, refs, objects, and lock files.
+        // Test creating a directory and file directly:
         try {
-            File probe = new File(directFile, ".repostudio_probe_" + System.currentTimeMillis());
-            if (probe.createNewFile()) {
-                probe.delete();
+            File probeDir = new File(directFile, ".repostudio_probe_" + System.currentTimeMillis());
+            if (probeDir.mkdir()) {
+                File probeFile = new File(probeDir, "test.tmp");
+                boolean created = probeFile.createNewFile();
+                if (created) probeFile.delete();
+                probeDir.delete();
+                if (!created) return false;
                 return true;
             }
         } catch (Exception e) {
@@ -330,6 +375,9 @@ public class SafFileManager {
 
     private int copyDocFolderToLocal(DocumentFile docFolder, File localDir) throws IOException {
         int count = 0;
+        if (!localDir.exists()) {
+            localDir.mkdirs();
+        }
         DocumentFile[] files = docFolder.listFiles();
         if (files == null) {
             return 0;
@@ -355,16 +403,25 @@ public class SafFileManager {
     }
 
     private boolean copyDocFile(DocumentFile doc, File localFile) {
-        try (InputStream in = this.context.getContentResolver().openInputStream(doc.getUri());
-             OutputStream out = new FileOutputStream(localFile)) {
-            if (in == null) return false;
-            byte[] buf = new byte[16384];
-            int len;
-            while ((len = in.read(buf)) > 0) {
-                out.write(buf, 0, len);
+        try {
+            File parent = localFile.getParentFile();
+            if (parent != null && !parent.exists()) {
+                parent.mkdirs();
             }
-            out.flush();
-            return true;
+            if (localFile.exists()) {
+                localFile.delete();
+            }
+            try (InputStream in = this.context.getContentResolver().openInputStream(doc.getUri());
+                 OutputStream out = new FileOutputStream(localFile)) {
+                if (in == null) return false;
+                byte[] buf = new byte[16384];
+                int len;
+                while ((len = in.read(buf)) > 0) {
+                    out.write(buf, 0, len);
+                }
+                out.flush();
+                return true;
+            }
         } catch (Exception e) {
             Log.w(TAG, "Failed to copy file " + doc.getName() + ": " + e.getMessage());
             return false;

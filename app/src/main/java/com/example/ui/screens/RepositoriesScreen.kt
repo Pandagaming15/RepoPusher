@@ -529,6 +529,23 @@ fun RepositoriesScreen(
                 // Saved Repository Paths tab (Room database)
                 RepositoryPathsScreen(
                     viewModel = repoPathsViewModel,
+                    isEmbedded = true,
+                    onOpenRepositoryPath = { entity ->
+                        val matched = localRepos.find { it.path == entity.path }
+                        if (matched != null) {
+                            onSelectRepo(matched)
+                        } else {
+                            val r = LocalRepository(
+                                entity.name,
+                                entity.path,
+                                entity.remoteUrl,
+                                entity.branch,
+                                entity.isGitRepo
+                            )
+                            onSelectRepo(r)
+                        }
+                    },
+                    onPickFolderFromSaf = onPickFolder,
                     onNavigateBack = {}
                 )
             }

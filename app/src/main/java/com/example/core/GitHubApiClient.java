@@ -119,8 +119,34 @@ public class GitHubApiClient {
             try (Response response = this.httpClient.newCall(request).execute()) {
                 String resStr = response.body() != null ? response.body().string() : "{}";
                 if (!response.isSuccessful()) {
-                    JSONObject err = new JSONObject(resStr);
-                    throw new IOException(err.optString("message", "HTTP " + response.code()));
+                    String errorMsg = "HTTP " + response.code();
+                    try {
+                        JSONObject err = new JSONObject(resStr);
+                        String msg = err.optString("message", "");
+                        if (!msg.isEmpty()) {
+                            errorMsg = msg;
+                        }
+                        JSONArray errors = err.optJSONArray("errors");
+                        if (errors != null && errors.length() > 0) {
+                            StringBuilder sb = new StringBuilder();
+                            for (int k = 0; k < errors.length(); k++) {
+                                Object item = errors.get(k);
+                                if (item instanceof JSONObject) {
+                                    JSONObject eObj = (JSONObject) item;
+                                    String m = eObj.optString("message", "");
+                                    if (!m.isEmpty()) {
+                                        if (sb.length() > 0) sb.append(", ");
+                                        sb.append(m);
+                                    }
+                                }
+                            }
+                            if (sb.length() > 0) {
+                                errorMsg += " (" + sb.toString() + ")";
+                            }
+                        }
+                    } catch (Exception ignored) {
+                    }
+                    throw new IOException(errorMsg);
                 }
                 JSONObject obj = new JSONObject(resStr);
                 GitHubRepo repo = new GitHubRepo();

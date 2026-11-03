@@ -345,8 +345,8 @@ fun HomeScreen(
                     Column(modifier = Modifier.padding(12.dp)) {
                         Icon(Icons.Default.Description, contentDescription = null, tint = GitHubBlue, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Project Files", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = GitHubTextPrimary)
-                        Text("${projectFiles.size} files", fontSize = 11.sp, color = GitHubTextSecondary)
+                        val regularFiles = projectFiles.count { !it.isDirectory }
+                        Text(if (regularFiles > 0) "$regularFiles files" else "${projectFiles.size} items", fontSize = 11.sp, color = GitHubTextSecondary)
                     }
                 }
 

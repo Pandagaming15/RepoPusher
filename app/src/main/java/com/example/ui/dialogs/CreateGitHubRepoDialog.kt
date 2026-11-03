@@ -28,6 +28,9 @@ fun CreateGitHubRepoDialog(
     var isPrivate by remember { mutableStateOf(false) }
     var autoInit by remember { mutableStateOf(true) }
     var tokenInput by remember { mutableStateOf("") }
+    var tokenSavedLocally by remember { mutableStateOf(false) }
+
+    val effectiveAuthenticated = isAuthenticated || tokenSavedLocally
 
     Dialog(onDismissRequest = { if (!isLoading) onDismiss() }) {
         Surface(
@@ -45,12 +48,12 @@ fun CreateGitHubRepoDialog(
                     fontWeight = FontWeight.Bold
                 )
 
-                if (!isAuthenticated) {
+                if (!effectiveAuthenticated) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Please enter your GitHub Personal Access Token first.",
+                        "Please enter your GitHub Personal Access Token (with 'repo' scope).",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Spacer(Modifier.height(12.dp))
@@ -75,6 +78,7 @@ fun CreateGitHubRepoDialog(
                             onClick = {
                                 if (tokenInput.isNotBlank()) {
                                     onSaveToken(tokenInput.trim())
+                                    tokenSavedLocally = true
                                 }
                             },
                             enabled = tokenInput.isNotBlank(),
@@ -84,8 +88,9 @@ fun CreateGitHubRepoDialog(
                         }
                     }
                 } else {
+                    val displayUser = if (currentUsername.isNotBlank()) "@$currentUsername" else "your GitHub account"
                     Text(
-                        "Create a new remote repository under @$currentUsername",
+                        "Create a new remote repository under $displayUser",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

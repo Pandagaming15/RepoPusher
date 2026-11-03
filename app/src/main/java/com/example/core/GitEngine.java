@@ -145,6 +145,7 @@ public class GitEngine {
                     .setMessage(message)
                     .setAuthor(ident)
                     .setCommitter(ident)
+                    .setAllowEmpty(true)
                     .call();
 
             String fullId = commit.getId().getName();
